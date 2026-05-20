@@ -10,6 +10,7 @@ SignalForge gives product teams one structured workflow: collect inputs, generat
 - **TypeScript** — type-safe application code
 - **Vite** — dev server and production build
 - **Vercel** — frontend hosting
+- **Supabase Auth** — signup, sign-in, session tokens
 - **Backend API** — [SignalForge API](https://signalforge-api.vercel.app)
 
 ## Production URLs
@@ -36,17 +37,23 @@ The dev server runs at `http://localhost:5173` by default.
 | Variable | Description |
 | -------- | ----------- |
 | `VITE_API_BASE_URL` | Base URL for the SignalForge backend API (no `/api` suffix) |
+| `VITE_SUPABASE_URL` | Supabase project URL |
+| `VITE_SUPABASE_ANON_KEY` | Supabase anonymous (public) key for client auth |
 
-**Local development** — point at a running backend:
+**Local development** — point at a running backend and your Supabase project:
 
 ```env
 VITE_API_BASE_URL=http://localhost:3000
+VITE_SUPABASE_URL=https://YOUR_PROJECT_ID.supabase.co
+VITE_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
 ```
 
-**Production / preview against deployed API** — use the Vercel backend:
+**Production / preview against deployed API** — use the Vercel backend and Supabase:
 
 ```env
 VITE_API_BASE_URL=https://signalforge-api.vercel.app
+VITE_SUPABASE_URL=https://YOUR_PROJECT_ID.supabase.co
+VITE_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
 ```
 
 If `VITE_API_BASE_URL` is not set, the app falls back to `http://localhost:3000`.
@@ -69,10 +76,12 @@ npm run preview
 
 Deploy to Vercel (or any static host that runs `npm run build`).
 
-**Required Vercel environment variable:**
+**Required Vercel environment variables:**
 
 ```env
 VITE_API_BASE_URL=https://signalforge-api.vercel.app
+VITE_SUPABASE_URL=https://YOUR_PROJECT_ID.supabase.co
+VITE_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
 ```
 
 Set this in the Vercel project **Settings → Environment Variables** for Production (and Preview if desired). Redeploy after changing env vars so Vite bakes the value into the build.
@@ -110,13 +119,22 @@ The frontend talks to the backend at `VITE_API_BASE_URL` (routes do **not** use 
 
 Opening a project calls `GET /projects/:id/workspace` and loads stored inputs, latest insight, report, PRD, and tasks into the UI.
 
+**Authentication:** Users sign in with Supabase Auth. The frontend sends the Supabase access token on product API requests:
+
+```
+Authorization: Bearer <supabase_access_token>
+```
+
+The backend health endpoint (`/api/health`) remains public. Product routes require a valid token.
+
 API client: `src/lib/api.ts`  
+Supabase client: `src/lib/supabase.ts`  
 Main app state and flow: `src/App.tsx`
 
 ## Known MVP limitations
 
-- **No login yet** — there is no Supabase Auth or session handling in the frontend
-- **Shared project list** — projects are currently global, not scoped to a user
+- **Email/password auth only** — no OAuth providers in the UI yet
+- **User-scoped projects** — backend filters by authenticated user; shared/global lists are removed
 - **Deterministic outputs** — backend generation is mock-like / deterministic, not real LLM output
 - **No real AI pipeline** — LLM integration is planned for a later phase
 - **Basic error UX** — errors appear inline; no toast/retry patterns yet
@@ -124,8 +142,7 @@ Main app state and flow: `src/App.tsx`
 
 ## Next backlog
 
-- Supabase Auth (signup, login, session)
-- User-specific projects (no global shared list after auth)
+- OAuth / SSO providers via Supabase
 - Better error and toast UX with retry
 - Delete or archive project endpoints and UI
 - Real LLM generation with persisted outputs
@@ -136,8 +153,9 @@ Main app state and flow: `src/App.tsx`
 
 ```
 src/
-  App.tsx          # Main product flow and UI
-  lib/api.ts       # API client and types
+  App.tsx          # Main product flow, auth UI, and state
+  lib/api.ts       # API client, types, auth token provider
+  lib/supabase.ts  # Supabase client
   main.tsx         # React entry
   styles.css       # Global styles
 docs/

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import type { Session } from '@supabase/supabase-js'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowRight,
@@ -9,18 +10,22 @@ import {
   FolderKanban,
   Layers3,
   ListChecks,
+  LogOut,
   Plus,
   Sparkles,
 } from 'lucide-react'
 import {
   api,
+  ApiUnauthorizedError,
   Project as ApiProject,
   Insight,
   Report,
   Prd,
+  setAccessTokenProvider,
   TaskRun,
   Workspace,
 } from './lib/api'
+import { supabase } from './lib/supabase'
 
 type Step = 'Project' | 'Inputs' | 'Insights' | 'Report' | 'PRD' | 'Tasks'
 type View = 'landing' | 'projects' | Step | 'complete'
@@ -244,12 +249,18 @@ function mapPrd(apiPrd: Prd) {
   }
 }
 
+type AuthMode = 'sign-in' | 'sign-up'
+
 function TopNav({
   onGoLanding,
   onGoProjects,
+  onLogout,
+  userEmail,
 }: {
   onGoLanding: () => void
   onGoProjects: () => void
+  onLogout: () => void
+  userEmail?: string
 }) {
   return (
     <header className="topbar">
@@ -263,11 +274,139 @@ function TopNav({
         </span>
       </button>
 
-      <nav className="top-links">
+      <nav className="top-links top-links-auth">
         <button onClick={onGoLanding}>Overview</button>
         <button onClick={onGoProjects}>Projects</button>
+        {userEmail ? (
+          <span className="auth-user-email">{userEmail}</span>
+        ) : null}
+        <button className="btn-logout" onClick={onLogout}>
+          <LogOut size={15} /> Sign out
+        </button>
       </nav>
     </header>
+  )
+}
+
+function AuthScreen({
+  authMode,
+  authEmail,
+  authPassword,
+  authError,
+  isSubmitting,
+  onEmailChange,
+  onPasswordChange,
+  onSignIn,
+  onSignUp,
+  onToggleMode,
+}: {
+  authMode: AuthMode
+  authEmail: string
+  authPassword: string
+  authError: string | null
+  isSubmitting: boolean
+  onEmailChange: (value: string) => void
+  onPasswordChange: (value: string) => void
+  onSignIn: () => void
+  onSignUp: () => void
+  onToggleMode: () => void
+}) {
+  return (
+    <div className="auth-screen">
+      <div className="auth-card card">
+        <div className="auth-brand">
+          <span className="brand-mark">
+            <Sparkles size={18} />
+          </span>
+          <div>
+            <span className="brand-kicker">Product operations platform</span>
+            <span className="brand-name">SignalForge</span>
+          </div>
+        </div>
+
+        <div className="auth-head">
+          <h1>{authMode === 'sign-in' ? 'Sign in' : 'Create account'}</h1>
+          <p className="muted-copy">
+            {authMode === 'sign-in'
+              ? 'Access your projects and continue product workflows.'
+              : 'Create an account to start turning feedback into insights, PRDs, and tasks.'}
+          </p>
+        </div>
+
+        {authError ? (
+          <div className="auth-error-box">
+            <strong>Authentication error</strong>
+            <p>{authError}</p>
+          </div>
+        ) : null}
+
+        <div className="auth-form">
+          <div className="field">
+            <label htmlFor="auth-email">Email</label>
+            <input
+              id="auth-email"
+              type="email"
+              autoComplete="email"
+              value={authEmail}
+              onChange={(event) => onEmailChange(event.target.value)}
+              placeholder="you@company.com"
+            />
+          </div>
+
+          <div className="field stack-top">
+            <label htmlFor="auth-password">Password</label>
+            <input
+              id="auth-password"
+              type="password"
+              autoComplete={
+                authMode === 'sign-in' ? 'current-password' : 'new-password'
+              }
+              value={authPassword}
+              onChange={(event) => onPasswordChange(event.target.value)}
+              placeholder="Enter your password"
+            />
+          </div>
+
+          <div className="button-row stack-top-lg">
+            {authMode === 'sign-in' ? (
+              <button
+                className="btn btn-dark"
+                onClick={onSignIn}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Signing in...' : 'Sign in'}
+              </button>
+            ) : (
+              <button
+                className="btn btn-dark"
+                onClick={onSignUp}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Creating account...' : 'Create account'}
+              </button>
+            )}
+          </div>
+
+          <div className="auth-toggle">
+            {authMode === 'sign-in' ? (
+              <p>
+                New to SignalForge?{' '}
+                <button type="button" onClick={onToggleMode}>
+                  Create an account
+                </button>
+              </p>
+            ) : (
+              <p>
+                Already have an account?{' '}
+                <button type="button" onClick={onToggleMode}>
+                  Sign in
+                </button>
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -403,6 +542,14 @@ function ListBlock({ title, items }: { title: string; items: string[] }) {
 }
 
 export default function App() {
+  const [session, setSession] = useState<Session | null>(null)
+  const [authLoading, setAuthLoading] = useState(true)
+  const [authEmail, setAuthEmail] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [authMode, setAuthMode] = useState<AuthMode>('sign-in')
+  const [authError, setAuthError] = useState<string | null>(null)
+  const [isAuthSubmitting, setIsAuthSubmitting] = useState(false)
+
   const [view, setView] = useState<View>('landing')
   const [projects, setProjects] = useState<Project[]>([])
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
@@ -488,11 +635,108 @@ export default function App() {
   }
 
   useEffect(() => {
-    void loadProjectsFromApi()
+    setAccessTokenProvider(async () => {
+      const {
+        data: { session: currentSession },
+      } = await supabase.auth.getSession()
+      return currentSession?.access_token ?? null
+    })
+
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      setSession(initialSession)
+      setAuthLoading(false)
+    })
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession)
+      setAuthLoading(false)
+      if (!nextSession) {
+        clearProductState()
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [])
 
+  useEffect(() => {
+    if (session?.user?.id) {
+      void loadProjectsFromApi()
+    }
+  }, [session?.user?.id])
+
+  function clearProductState() {
+    setProjects([])
+    setCurrentProjectId(null)
+    setIsDemoMode(false)
+    setApiInsight(null)
+    setApiReport(null)
+    setApiTasks(null)
+    setPrd(defaultPrd)
+    setInputText(sampleInput)
+    setApiError(null)
+    setView('landing')
+    setOpeningProjectId(null)
+    setIsLoading(false)
+  }
+
+  function resolveApiError(error: unknown, fallback: string) {
+    if (error instanceof ApiUnauthorizedError) {
+      setAuthError(error.message)
+      void supabase.auth.signOut()
+      return error.message
+    }
+
+    return error instanceof Error ? error.message : fallback
+  }
+
+  async function handleSignIn() {
+    setAuthError(null)
+    setIsAuthSubmitting(true)
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: authEmail.trim(),
+      password: authPassword,
+    })
+
+    if (error) {
+      setAuthError(error.message)
+    }
+
+    setIsAuthSubmitting(false)
+  }
+
+  async function handleSignUp() {
+    setAuthError(null)
+    setIsAuthSubmitting(true)
+
+    const { error } = await supabase.auth.signUp({
+      email: authEmail.trim(),
+      password: authPassword,
+    })
+
+    if (error) {
+      setAuthError(error.message)
+    } else {
+      setAuthError(
+        'Account created. Check your email if confirmation is required, then sign in.',
+      )
+      setAuthMode('sign-in')
+    }
+
+    setIsAuthSubmitting(false)
+  }
+
+  async function handleSignOut() {
+    setAuthError(null)
+    await supabase.auth.signOut()
+  }
+
   async function loadProjectsFromApi() {
-    if (isLoading) return
+    if (isLoading || !session) return
 
     try {
       setIsLoading(true)
@@ -511,11 +755,7 @@ export default function App() {
         setCurrentProjectId(null)
       }
     } catch (error) {
-      setApiError(
-        error instanceof Error
-          ? error.message
-          : 'Could not load projects from backend.',
-      )
+      setApiError(resolveApiError(error, 'Could not load projects from backend.'))
     } finally {
       setIsLoading(false)
     }
@@ -575,9 +815,7 @@ export default function App() {
       setView('Inputs')
       flashCopy('Project created')
     } catch (error) {
-      setApiError(
-        error instanceof Error ? error.message : 'Failed to create project.',
-      )
+      setApiError(resolveApiError(error, 'Failed to create project.'))
     } finally {
       setIsLoading(false)
     }
@@ -628,11 +866,7 @@ export default function App() {
       hydrateWorkspace(workspace)
       setApiError(null)
     } catch (error) {
-      setApiError(
-        error instanceof Error
-          ? error.message
-          : 'Failed to load project workspace.',
-      )
+      setApiError(resolveApiError(error, 'Failed to load project workspace.'))
     } finally {
       setOpeningProjectId(null)
       setIsLoading(false)
@@ -669,9 +903,7 @@ export default function App() {
       updateProjectStageLocally('Insights', 'insights_generated')
       flashCopy('Insights generated')
     } catch (error) {
-      setApiError(
-        error instanceof Error ? error.message : 'Failed to generate insights.',
-      )
+      setApiError(resolveApiError(error, 'Failed to generate insights.'))
     } finally {
       setIsLoading(false)
     }
@@ -692,9 +924,7 @@ export default function App() {
       updateProjectStageLocally('Report', 'report_generated')
       flashCopy('Report generated')
     } catch (error) {
-      setApiError(
-        error instanceof Error ? error.message : 'Failed to generate report.',
-      )
+      setApiError(resolveApiError(error, 'Failed to generate report.'))
     } finally {
       setIsLoading(false)
     }
@@ -715,9 +945,7 @@ export default function App() {
       updateProjectStageLocally('PRD', 'prd_generated')
       flashCopy('PRD generated')
     } catch (error) {
-      setApiError(
-        error instanceof Error ? error.message : 'Failed to generate PRD.',
-      )
+      setApiError(resolveApiError(error, 'Failed to generate PRD.'))
     } finally {
       setIsLoading(false)
     }
@@ -749,9 +977,7 @@ export default function App() {
       updateProjectStageLocally('Tasks', 'tasks_generated')
       flashCopy('Tasks generated')
     } catch (error) {
-      setApiError(
-        error instanceof Error ? error.message : 'Failed to generate tasks.',
-      )
+      setApiError(resolveApiError(error, 'Failed to generate tasks.'))
     } finally {
       setIsLoading(false)
     }
@@ -760,6 +986,47 @@ export default function App() {
   function flashCopy(message: string) {
     setCopied(message)
     window.setTimeout(() => setCopied(null), 1400)
+  }
+
+  if (authLoading) {
+    return (
+      <div className="app-bg auth-loading-screen">
+        <div className="bg-orb orb-one" />
+        <div className="bg-orb orb-two" />
+        <div className="bg-orb orb-three" />
+        <div className="auth-loading-card card">
+          <span className="brand-mark auth-loading-mark">
+            <Sparkles size={18} />
+          </span>
+          <p className="muted-copy">Loading session...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!session) {
+    return (
+      <div className="app-bg">
+        <div className="bg-orb orb-one" />
+        <div className="bg-orb orb-two" />
+        <div className="bg-orb orb-three" />
+        <AuthScreen
+          authMode={authMode}
+          authEmail={authEmail}
+          authPassword={authPassword}
+          authError={authError}
+          isSubmitting={isAuthSubmitting}
+          onEmailChange={setAuthEmail}
+          onPasswordChange={setAuthPassword}
+          onSignIn={() => void handleSignIn()}
+          onSignUp={() => void handleSignUp()}
+          onToggleMode={() => {
+            setAuthError(null)
+            setAuthMode((mode) => (mode === 'sign-in' ? 'sign-up' : 'sign-in'))
+          }}
+        />
+      </div>
+    )
   }
 
   return (
@@ -771,6 +1038,8 @@ export default function App() {
       <TopNav
         onGoLanding={() => setView('landing')}
         onGoProjects={() => setView('projects')}
+        onLogout={() => void handleSignOut()}
+        userEmail={session.user.email ?? undefined}
       />
 
       <main className="container app-main">

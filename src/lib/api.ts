@@ -1,5 +1,4 @@
 // Backend/product backlog (see README.md and docs/DEPLOYMENT.md):
-// 1. Supabase Auth — signup/login, session, ownerId on projects
 // 3. Multi-user access — per-user project lists after auth
 // 4. DELETE /projects/:id or PATCH archive
 // 5. Better error UI — toast, inline retry, error types
@@ -8,8 +7,24 @@
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000';
 
+let getAccessToken: (() => Promise<string | null>) | null = null;
+
+export function setAccessTokenProvider(
+  provider: () => Promise<string | null>,
+) {
+  getAccessToken = provider;
+}
+
+export class ApiUnauthorizedError extends Error {
+  constructor(message = 'Your session expired. Please sign in again.') {
+    super(message);
+    this.name = 'ApiUnauthorizedError';
+  }
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const hasBody = Boolean(options?.body);
+  const token = getAccessToken ? await getAccessToken() : null;
 
   try {
     const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -17,9 +32,14 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       cache: 'no-store',
       headers: {
         ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(options?.headers ?? {}),
       },
     });
+
+    if (response.status === 401) {
+      throw new ApiUnauthorizedError();
+    }
 
     if (!response.ok) {
       const errorBody = await response.text();
@@ -31,6 +51,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
     return response.json() as Promise<T>;
   } catch (error) {
+    if (error instanceof ApiUnauthorizedError) {
+      throw error;
+    }
+
     if (error instanceof Error) {
       throw new Error(`API request failed for ${path}: ${error.message}`);
     }

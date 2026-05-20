@@ -221,6 +221,131 @@ input:focus, textarea:focus { border-color: #a5b4fc; box-shadow: 0 0 0 4px rgba(
   color: var(--muted);
 }
 
+.auth-loading-screen,
+.auth-screen {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.auth-loading-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 28px 32px;
+  text-align: center;
+}
+
+.auth-loading-mark {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #4f46e5, #14b8a6);
+  color: white;
+}
+
+.auth-card {
+  width: min(460px, 100%);
+  padding: 32px;
+}
+
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.auth-head h1 {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: -0.03em;
+}
+
+.auth-head p {
+  margin: 10px 0 0;
+  line-height: 1.7;
+}
+
+.auth-error-box {
+  margin-top: 20px;
+  padding: 14px 16px;
+  border: 1px solid #fecdd3;
+  border-radius: 18px;
+  background: var(--red-soft);
+}
+
+.auth-error-box strong {
+  display: block;
+  color: var(--red-text);
+  font-size: 14px;
+}
+
+.auth-error-box p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.auth-form {
+  margin-top: 24px;
+}
+
+.auth-toggle {
+  margin-top: 18px;
+  text-align: center;
+}
+
+.auth-toggle p {
+  margin: 0;
+  color: var(--muted-soft);
+  font-size: 14px;
+}
+
+.auth-toggle button {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--indigo);
+  font-weight: 600;
+}
+
+.top-links-auth {
+  align-items: center;
+}
+
+.auth-user-email {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--muted-soft);
+}
+
+.btn-logout {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: white;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.btn-logout:hover {
+  border-color: #cbd5e1;
+  color: var(--text);
+}
+
 @media (max-width: 1100px) {
   .hero-grid, .grid-2-wide, .grid-4, .grid-3, .grid-2, .mini-grid, .stats-row, .form-grid { grid-template-columns: 1fr; }
 }
