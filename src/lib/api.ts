@@ -1,13 +1,14 @@
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000';
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  async function request<T>(path: string, options?: RequestInit): Promise<T> {
+    const hasBody = Boolean(options?.body);
+  
+    const response = await fetch(`${API_BASE_URL}${path}`, {
       ...options,
       cache: 'no-store',
       headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache',
+        ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
         ...(options?.headers ?? {}),
       },
     });
@@ -19,6 +20,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   
     return response.json() as Promise<T>;
   }
+  
 export type Project = {
   id: string;
   name: string;
