@@ -1,9 +1,8 @@
-// Backend/product backlog (see project README for deployment notes):
+// Backend/product backlog (see README.md and docs/DEPLOYMENT.md):
 // 1. Supabase Auth — signup/login, session, ownerId on projects
 // 3. Multi-user access — per-user project lists after auth
 // 4. DELETE /projects/:id or PATCH archive
 // 5. Better error UI — toast, inline retry, error types
-// 6. README — local setup, Vercel env, Supabase, deployment
 // 7. Real LLM pipeline for insights/report/PRD/tasks generation
 
 const API_BASE_URL =
