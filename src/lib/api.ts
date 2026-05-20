@@ -1,22 +1,24 @@
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000';
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options?.headers ?? {}),
-    },
-    ...options,
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(errorBody || `Request failed with status ${response.status}`);
+  async function request<T>(path: string, options?: RequestInit): Promise<T> {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      cache: 'no-store',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        ...(options?.headers ?? {}),
+      },
+    });
+  
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(errorBody || `Request failed with status ${response.status}`);
+    }
+  
+    return response.json() as Promise<T>;
   }
-
-  return response.json() as Promise<T>;
-}
 
 export type Project = {
   id: string;
