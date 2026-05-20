@@ -1,9 +1,20 @@
+// Backend/product backlog (see project README for deployment notes):
+// 1. GET /projects/:id/workspace — hydrate project + inputs + latest outputs
+// 2. Supabase Auth — signup/login, session, ownerId on projects
+// 3. Multi-user access — per-user project lists after auth
+// 4. DELETE /projects/:id or PATCH archive
+// 5. Better error UI — toast, inline retry, error types
+// 6. README — local setup, Vercel env, Supabase, deployment
+// 7. Workspace hydration on project open (replace mock fallbacks)
+// 8. Real LLM pipeline for insights/report/PRD/tasks generation
+
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000';
 
-  async function request<T>(path: string, options?: RequestInit): Promise<T> {
-    const hasBody = Boolean(options?.body);
-  
+async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const hasBody = Boolean(options?.body);
+
+  try {
     const response = await fetch(`${API_BASE_URL}${path}`, {
       ...options,
       cache: 'no-store',
@@ -12,15 +23,25 @@ const API_BASE_URL =
         ...(options?.headers ?? {}),
       },
     });
-  
+
     if (!response.ok) {
       const errorBody = await response.text();
-      throw new Error(errorBody || `Request failed with status ${response.status}`);
+      throw new Error(
+        errorBody ||
+          `Request failed: ${response.status} ${response.statusText} for ${path}`,
+      );
     }
-  
+
     return response.json() as Promise<T>;
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(`API request failed for ${path}: ${error.message}`);
+    }
+
+    throw new Error(`API request failed for ${path}`);
   }
-  
+}
+
 export type Project = {
   id: string;
   name: string;

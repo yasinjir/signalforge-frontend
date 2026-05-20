@@ -37,36 +37,21 @@ type Project = {
 
 const steps: Step[] = ['Project', 'Inputs', 'Insights', 'Report', 'PRD', 'Tasks']
 
-const seedProjects: Project[] = [
-  {
-    id: '1',
-    name: 'Match Experience Improvement',
-    initiative: 'Improve match discovery, join flow, and reminder experience',
-    stage: 'Insights',
-    updated: 'Today',
-    status: 'In progress',
-    context:
-      'Recent user feedback suggests friction across the match experience. Users report confusion when finding past sessions, too many steps to join matches, and weak reminder timing.',
-    goal:
-      'Turn recent user feedback into structured product insight, a draft PRD, and a task breakdown for product planning.',
-  },
-  {
-    id: '2',
-    name: 'Player Search Quality Review',
-    initiative: 'Improve search relevance and filtering experience',
-    stage: 'Report',
-    updated: 'Yesterday',
-    status: 'Review ready',
-  },
-  {
-    id: '3',
-    name: 'Session Visibility Update',
-    initiative: 'Make upcoming and past sessions easier to access',
-    stage: 'PRD',
-    updated: '2 days ago',
-    status: 'Draft in progress',
-  },
-]
+const DEMO_PROJECT_ID = 'demo-local'
+
+/** Local-only preview project; never mixed with API-backed project list. */
+const demoProject: Project = {
+  id: DEMO_PROJECT_ID,
+  name: 'Match Experience Improvement (demo)',
+  initiative: 'Improve match discovery, join flow, and reminder experience',
+  stage: 'Insights',
+  updated: 'Demo',
+  status: 'Sample preview',
+  context:
+    'Recent user feedback suggests friction across the match experience. Users report confusion when finding past sessions, too many steps to join matches, and weak reminder timing.',
+  goal:
+    'Turn recent user feedback into structured product insight, a draft PRD, and a task breakdown for product planning.',
+}
 
 const sampleInput = `- The app is useful but finding past sessions is confusing.
 - I want an easier way to reschedule matches.
@@ -285,19 +270,60 @@ function TopNav({
   )
 }
 
+function NoProjectPrompt({
+  onCreateProject,
+  onGoProjects,
+}: {
+  onCreateProject: () => void
+  onGoProjects: () => void
+}) {
+  return (
+    <section className="card section-card">
+      <div className="section-head">
+        <h3>Create a project first</h3>
+        <p>
+          Create a SignalForge project to turn raw feedback into structured
+          insights, a report, PRD, and execution-ready tasks.
+        </p>
+      </div>
+
+      <div className="button-row stack-top-lg">
+        <button className="btn btn-dark" onClick={onCreateProject}>
+          <Plus size={16} /> Create project
+        </button>
+        <button className="btn btn-light" onClick={onGoProjects}>
+          Back to projects
+        </button>
+      </div>
+    </section>
+  )
+}
+
 function StepShell({
   project,
   view,
   onStepClick,
+  isDemoMode,
   children,
 }: {
   project: Project
   view: View
   onStepClick: (step: Step) => void
+  isDemoMode?: boolean
   children: React.ReactNode
 }) {
   return (
     <div className="step-shell">
+      {isDemoMode ? (
+        <div className="card demo-banner">
+          <strong>Demo preview</strong>
+          <p className="muted-copy">
+            Sample content only. Create a project and sync with the backend to
+            save real outputs.
+          </p>
+        </div>
+      ) : null}
+
       <div className="project-bar card">
         <div className="project-bar-top">
           <div>
@@ -377,8 +403,9 @@ function ListBlock({ title, items }: { title: string; items: string[] }) {
 
 export default function App() {
   const [view, setView] = useState<View>('landing')
-  const [projects, setProjects] = useState<Project[]>(seedProjects)
-  const [currentProjectId, setCurrentProjectId] = useState(seedProjects[0].id)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
+  const [isDemoMode, setIsDemoMode] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
   const [apiError, setApiError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -400,10 +427,29 @@ export default function App() {
 
   const [prd, setPrd] = useState(defaultPrd)
 
-  const currentProject = useMemo(
-    () => projects.find((project) => project.id === currentProjectId) ?? projects[0],
-    [projects, currentProjectId],
+  const currentProject = useMemo(() => {
+    if (isDemoMode) return demoProject
+    if (!currentProjectId) return undefined
+    return projects.find((project) => project.id === currentProjectId)
+  }, [projects, currentProjectId, isDemoMode])
+
+  const activeProjectId = isDemoMode ? null : currentProjectId
+
+  const createFlowProject = useMemo(
+    (): Project => ({
+      id: 'new',
+      name: projectForm.name || 'New project',
+      initiative: projectForm.initiative || 'No initiative provided',
+      stage: 'Project',
+      updated: 'Now',
+      status: 'Draft',
+      context: projectForm.context,
+      goal: projectForm.goal,
+    }),
+    [projectForm],
   )
+
+  const stepShellProject = currentProject ?? createFlowProject
 
   const feedbackCount = useMemo(
     () =>
@@ -444,14 +490,23 @@ export default function App() {
   }, [])
 
   async function loadProjectsFromApi() {
+    if (isLoading) return
+
     try {
+      setIsLoading(true)
       setApiError(null)
+
       const data = await api.listProjects()
+      setApiError(null)
 
       if (data.length > 0) {
         const mappedProjects = data.map(mapApiProject)
         setProjects(mappedProjects)
         setCurrentProjectId(mappedProjects[0].id)
+        setIsDemoMode(false)
+      } else {
+        setProjects([])
+        setCurrentProjectId(null)
       }
     } catch (error) {
       setApiError(
@@ -459,13 +514,26 @@ export default function App() {
           ? error.message
           : 'Could not load projects from backend.',
       )
+    } finally {
+      setIsLoading(false)
     }
   }
 
+  function requireBackendProject(): string | null {
+    if (!activeProjectId) {
+      setApiError('Create a project first to use backend generation.')
+      setView('Project')
+      return null
+    }
+    return activeProjectId
+  }
+
   function updateProjectStageLocally(stage: Step, status = 'In progress') {
+    if (!activeProjectId) return
+
     setProjects((prev) =>
       prev.map((project) =>
-        project.id === currentProjectId
+        project.id === activeProjectId
           ? {
               ...project,
               stage,
@@ -493,6 +561,8 @@ export default function App() {
 
       const mapped = mapApiProject(created)
 
+      setApiError(null)
+      setIsDemoMode(false)
       setProjects((prev) => [mapped, ...prev])
       setCurrentProjectId(mapped.id)
       setView('Inputs')
@@ -507,11 +577,20 @@ export default function App() {
   }
 
   function openProject(project: Project) {
+    setIsDemoMode(false)
     setCurrentProjectId(project.id)
     setView(project.stage)
   }
 
+  function startDemoPreview() {
+    setIsDemoMode(true)
+    setView('Insights')
+  }
+
   async function generateInsightsFromInput() {
+    const projectId = requireBackendProject()
+    if (!projectId) return
+
     try {
       setIsLoading(true)
       setApiError(null)
@@ -520,14 +599,15 @@ export default function App() {
         throw new Error('Input is empty. Add feedback before generating insights.')
       }
 
-      await api.createInput(currentProjectId, {
+      await api.createInput(projectId, {
         title: 'Raw feedback batch',
         inputType: 'raw_text',
         contentText: inputText,
       })
 
-      const insight = await api.generateInsights(currentProjectId)
+      const insight = await api.generateInsights(projectId)
       setApiInsight(insight)
+      setApiError(null)
 
       updateProjectStageLocally('Insights', 'insights_generated')
       flashCopy('Insights generated')
@@ -541,12 +621,16 @@ export default function App() {
   }
 
   async function generateReportFromInsights() {
+    const projectId = requireBackendProject()
+    if (!projectId) return
+
     try {
       setIsLoading(true)
       setApiError(null)
 
-      const report = await api.generateReport(currentProjectId)
+      const report = await api.generateReport(projectId)
       setApiReport(report)
+      setApiError(null)
 
       updateProjectStageLocally('Report', 'report_generated')
       flashCopy('Report generated')
@@ -560,12 +644,16 @@ export default function App() {
   }
 
   async function generatePrdFromReport() {
+    const projectId = requireBackendProject()
+    if (!projectId) return
+
     try {
       setIsLoading(true)
       setApiError(null)
 
-      const generatedPrd = await api.generatePrd(currentProjectId)
+      const generatedPrd = await api.generatePrd(projectId)
       setPrd(mapPrd(generatedPrd))
+      setApiError(null)
 
       updateProjectStageLocally('PRD', 'prd_generated')
       flashCopy('PRD generated')
@@ -579,11 +667,14 @@ export default function App() {
   }
 
   async function savePrdAndGenerateTasks() {
+    const projectId = requireBackendProject()
+    if (!projectId) return
+
     try {
       setIsLoading(true)
       setApiError(null)
 
-      await api.updatePrd(currentProjectId, {
+      await api.updatePrd(projectId, {
         problemStatement: prd.problem,
         goalsText: prd.goals,
         targetUsersText: prd.users,
@@ -594,8 +685,9 @@ export default function App() {
         openQuestionsText: prd.questions,
       })
 
-      const taskRun = await api.generateTasks(currentProjectId)
+      const taskRun = await api.generateTasks(projectId)
       setApiTasks(taskRun)
+      setApiError(null)
 
       updateProjectStageLocally('Tasks', 'tasks_generated')
       flashCopy('Tasks generated')
@@ -667,8 +759,13 @@ export default function App() {
                       <button
                         className="btn btn-light"
                         onClick={() => {
-                          setCurrentProjectId(projects[0].id)
-                          setView('Insights')
+                          if (projects.length > 0) {
+                            setIsDemoMode(false)
+                            setCurrentProjectId(projects[0].id)
+                            setView(projects[0].stage)
+                          } else {
+                            startDemoPreview()
+                          }
                         }}
                       >
                         Review current module
@@ -798,59 +895,114 @@ export default function App() {
                   </div>
 
                   <div className="button-row">
-                    <button className="btn btn-dark" onClick={() => setView('Project')}>
+                    <button
+                      className="btn btn-dark"
+                      onClick={() => {
+                        setIsDemoMode(false)
+                        setView('Project')
+                      }}
+                      disabled={isLoading}
+                    >
                       <Plus size={16} /> Create project
                     </button>
 
+                    {projects.length > 0 ? (
+                      <button
+                        className="btn btn-light"
+                        onClick={() => openProject(projects[0])}
+                        disabled={isLoading}
+                      >
+                        Resume latest project
+                      </button>
+                    ) : null}
+
                     <button
                       className="btn btn-light"
-                      onClick={() => openProject(projects[0])}
+                      onClick={loadProjectsFromApi}
+                      disabled={isLoading}
                     >
-                      Resume latest project
-                    </button>
-
-                    <button className="btn btn-light" onClick={loadProjectsFromApi}>
-                      Sync backend projects
+                      {isLoading ? 'Syncing...' : 'Sync backend projects'}
                     </button>
                   </div>
                 </section>
 
-                <section className="grid-3">
-                  {projects.map((project) => (
-                    <article key={project.id} className="card project-card">
-                      <div className="tag-row">
-                        <span className="badge badge-neutral">{project.stage}</span>
-                        <span className="badge badge-green">{project.status}</span>
-                      </div>
+                {isLoading && projects.length === 0 ? (
+                  <section className="card section-card">
+                    <p className="muted-copy">Loading projects from backend...</p>
+                  </section>
+                ) : null}
 
-                      <h3>{project.name}</h3>
-                      <p>{project.initiative}</p>
+                {projects.length === 0 && !isLoading ? (
+                  <section className="card section-card empty-state-card">
+                    <div className="section-head">
+                      <h3>No projects yet</h3>
+                      <p>
+                        Create your first SignalForge project to turn raw feedback
+                        into structured insights, a report, PRD, and execution-ready
+                        tasks.
+                      </p>
+                    </div>
 
-                      <div className="small-copy">Last updated {project.updated}</div>
+                    <div className="button-row stack-top-lg">
+                      <button
+                        className="btn btn-dark"
+                        onClick={() => {
+                          setIsDemoMode(false)
+                          setView('Project')
+                        }}
+                      >
+                        <Plus size={16} /> Create project
+                      </button>
 
-                      <div className="button-row">
-                        <button
-                          className="btn btn-dark"
-                          onClick={() => openProject(project)}
-                        >
-                          Open project
-                        </button>
-                        <button
-                          className="btn btn-light"
-                          onClick={() => openProject(project)}
-                        >
-                          Continue
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                </section>
+                      <button
+                        className="btn btn-light"
+                        onClick={loadProjectsFromApi}
+                        disabled={isLoading}
+                      >
+                        Sync backend projects
+                      </button>
+                    </div>
+                  </section>
+                ) : (
+                  <section className="grid-3">
+                    {projects.map((project) => (
+                      <article key={project.id} className="card project-card">
+                        <div className="tag-row">
+                          <span className="badge badge-neutral">{project.stage}</span>
+                          <span className="badge badge-green">{project.status}</span>
+                        </div>
+
+                        <h3>{project.name}</h3>
+                        <p>{project.initiative}</p>
+
+                        <div className="small-copy">Last updated {project.updated}</div>
+
+                        <div className="button-row">
+                          <button
+                            className="btn btn-dark"
+                            onClick={() => openProject(project)}
+                            disabled={isLoading}
+                          >
+                            Open project
+                          </button>
+                          <button
+                            className="btn btn-light"
+                            onClick={() => openProject(project)}
+                            disabled={isLoading}
+                          >
+                            Continue
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </section>
+                )}
               </div>
             )}
 
             {view === 'Project' && (
               <StepShell
-                project={currentProject}
+                project={stepShellProject}
                 view={view}
                 onStepClick={(step) => setView(step)}
               >
@@ -930,10 +1082,12 @@ export default function App() {
               </StepShell>
             )}
 
-            {view === 'Inputs' && (
+            {view === 'Inputs' &&
+              (currentProject ? (
               <StepShell
                 project={currentProject}
                 view={view}
+                isDemoMode={isDemoMode}
                 onStepClick={(step) => setView(step)}
               >
                 <div className="grid-2-wide">
@@ -1008,12 +1162,19 @@ export default function App() {
                   </SectionCard>
                 </div>
               </StepShell>
-            )}
+              ) : (
+                <NoProjectPrompt
+                  onCreateProject={() => setView('Project')}
+                  onGoProjects={() => setView('projects')}
+                />
+              ))}
 
-            {view === 'Insights' && (
+            {view === 'Insights' &&
+              (currentProject ? (
               <StepShell
                 project={currentProject}
                 view={view}
+                isDemoMode={isDemoMode}
                 onStepClick={(step) => setView(step)}
               >
                 <SectionCard
@@ -1076,12 +1237,19 @@ export default function App() {
                   </div>
                 </SectionCard>
               </StepShell>
-            )}
+              ) : (
+                <NoProjectPrompt
+                  onCreateProject={() => setView('Project')}
+                  onGoProjects={() => setView('projects')}
+                />
+              ))}
 
-            {view === 'Report' && (
+            {view === 'Report' &&
+              (currentProject ? (
               <StepShell
                 project={currentProject}
                 view={view}
+                isDemoMode={isDemoMode}
                 onStepClick={(step) => setView(step)}
               >
                 <SectionCard
@@ -1133,12 +1301,19 @@ export default function App() {
                   </div>
                 </SectionCard>
               </StepShell>
-            )}
+              ) : (
+                <NoProjectPrompt
+                  onCreateProject={() => setView('Project')}
+                  onGoProjects={() => setView('projects')}
+                />
+              ))}
 
-            {view === 'PRD' && (
+            {view === 'PRD' &&
+              (currentProject ? (
               <StepShell
                 project={currentProject}
                 view={view}
+                isDemoMode={isDemoMode}
                 onStepClick={(step) => setView(step)}
               >
                 <SectionCard
@@ -1189,12 +1364,19 @@ export default function App() {
                   </div>
                 </SectionCard>
               </StepShell>
-            )}
+              ) : (
+                <NoProjectPrompt
+                  onCreateProject={() => setView('Project')}
+                  onGoProjects={() => setView('projects')}
+                />
+              ))}
 
-            {view === 'Tasks' && (
+            {view === 'Tasks' &&
+              (currentProject ? (
               <StepShell
                 project={currentProject}
                 view={view}
+                isDemoMode={isDemoMode}
                 onStepClick={(step) => setView(step)}
               >
                 <SectionCard
@@ -1242,7 +1424,12 @@ export default function App() {
                   </div>
                 </SectionCard>
               </StepShell>
-            )}
+              ) : (
+                <NoProjectPrompt
+                  onCreateProject={() => setView('Project')}
+                  onGoProjects={() => setView('projects')}
+                />
+              ))}
 
             {view === 'complete' && (
               <section className="completion-wrap">
