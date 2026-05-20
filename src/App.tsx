@@ -19,6 +19,7 @@ import {
   Report,
   Prd,
   TaskRun,
+  Workspace,
 } from './lib/api'
 
 type Step = 'Project' | 'Inputs' | 'Insights' | 'Report' | 'PRD' | 'Tasks'
@@ -409,6 +410,7 @@ export default function App() {
   const [copied, setCopied] = useState<string | null>(null)
   const [apiError, setApiError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [openingProjectId, setOpeningProjectId] = useState<string | null>(null)
 
   const [inputText, setInputText] = useState(sampleInput)
 
@@ -563,6 +565,11 @@ export default function App() {
 
       setApiError(null)
       setIsDemoMode(false)
+      setApiInsight(null)
+      setApiReport(null)
+      setApiTasks(null)
+      setPrd(defaultPrd)
+      setInputText(sampleInput)
       setProjects((prev) => [mapped, ...prev])
       setCurrentProjectId(mapped.id)
       setView('Inputs')
@@ -576,10 +583,60 @@ export default function App() {
     }
   }
 
-  function openProject(project: Project) {
+  function hydrateWorkspace(workspace: Workspace) {
+    const mappedProject = mapApiProject(workspace.project)
+
     setIsDemoMode(false)
-    setCurrentProjectId(project.id)
-    setView(project.stage)
+    setProjects((prev) => {
+      const exists = prev.some((p) => p.id === mappedProject.id)
+      if (exists) {
+        return prev.map((p) => (p.id === mappedProject.id ? mappedProject : p))
+      }
+      return [mappedProject, ...prev]
+    })
+
+    setCurrentProjectId(mappedProject.id)
+
+    const latestInput = workspace.inputs?.[0]
+    if (latestInput?.contentText) {
+      setInputText(latestInput.contentText)
+    } else {
+      setInputText(sampleInput)
+    }
+
+    setApiInsight(workspace.latestInsight ?? null)
+    setApiReport(workspace.latestReport ?? null)
+    setPrd(workspace.latestPrd ? mapPrd(workspace.latestPrd) : defaultPrd)
+    setApiTasks(workspace.latestTasks ?? null)
+
+    setView(mappedProject.stage)
+  }
+
+  async function openProject(project: Project) {
+    if (project.id === DEMO_PROJECT_ID) {
+      setIsDemoMode(true)
+      setView(project.stage)
+      return
+    }
+
+    try {
+      setOpeningProjectId(project.id)
+      setIsLoading(true)
+      setApiError(null)
+
+      const workspace = await api.getWorkspace(project.id)
+      hydrateWorkspace(workspace)
+      setApiError(null)
+    } catch (error) {
+      setApiError(
+        error instanceof Error
+          ? error.message
+          : 'Failed to load project workspace.',
+      )
+    } finally {
+      setOpeningProjectId(null)
+      setIsLoading(false)
+    }
   }
 
   function startDemoPreview() {
@@ -760,9 +817,7 @@ export default function App() {
                         className="btn btn-light"
                         onClick={() => {
                           if (projects.length > 0) {
-                            setIsDemoMode(false)
-                            setCurrentProjectId(projects[0].id)
-                            setView(projects[0].stage)
+                            void openProject(projects[0])
                           } else {
                             startDemoPreview()
                           }
@@ -909,10 +964,12 @@ export default function App() {
                     {projects.length > 0 ? (
                       <button
                         className="btn btn-light"
-                        onClick={() => openProject(projects[0])}
+                        onClick={() => void openProject(projects[0])}
                         disabled={isLoading}
                       >
-                        Resume latest project
+                        {openingProjectId === projects[0].id
+                          ? 'Opening...'
+                          : 'Resume latest project'}
                       </button>
                     ) : null}
 
@@ -921,7 +978,11 @@ export default function App() {
                       onClick={loadProjectsFromApi}
                       disabled={isLoading}
                     >
-                      {isLoading ? 'Syncing...' : 'Sync backend projects'}
+                      {isLoading && !openingProjectId
+                        ? projects.length === 0
+                          ? 'Loading...'
+                          : 'Syncing...'
+                        : 'Sync backend projects'}
                     </button>
                   </div>
                 </section>
@@ -980,17 +1041,21 @@ export default function App() {
                         <div className="button-row">
                           <button
                             className="btn btn-dark"
-                            onClick={() => openProject(project)}
+                            onClick={() => void openProject(project)}
                             disabled={isLoading}
                           >
-                            Open project
+                            {openingProjectId === project.id
+                              ? 'Opening...'
+                              : 'Open project'}
                           </button>
                           <button
                             className="btn btn-light"
-                            onClick={() => openProject(project)}
+                            onClick={() => void openProject(project)}
                             disabled={isLoading}
                           >
-                            Continue
+                            {openingProjectId === project.id
+                              ? 'Opening...'
+                              : 'Continue'}
                           </button>
                         </div>
                       </article>
