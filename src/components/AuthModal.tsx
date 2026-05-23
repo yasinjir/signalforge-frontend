@@ -1,7 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { X } from 'lucide-react'
+import { Sparkles, X } from 'lucide-react'
+import type { AuthMode } from './AuthModal.types'
 
-export type AuthMode = 'sign-in' | 'sign-up'
+export type { AuthMode } from './AuthModal.types'
 
 export function AuthModal({
   open,
@@ -40,20 +41,22 @@ export function AuthModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.25 }}
+          transition={{ duration: 0.28 }}
           onClick={onClose}
         >
           <motion.div
-            className="auth-modal-panel glass-card"
+            className="auth-modal-panel"
             role="dialog"
             aria-modal="true"
             aria-labelledby="auth-modal-title"
-            initial={{ opacity: 0, y: 20, scale: 0.98 }}
+            initial={{ opacity: 0, y: 24, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 16, scale: 0.98 }}
-            transition={{ duration: 0.35, ease: 'easeOut' }}
+            exit={{ opacity: 0, y: 18, scale: 0.97 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
             onClick={(event) => event.stopPropagation()}
           >
+            <div className="auth-modal-glow" aria-hidden />
+
             <button
               type="button"
               className="auth-modal-close"
@@ -61,40 +64,48 @@ export function AuthModal({
               disabled={isSubmitting}
               aria-label="Close"
             >
-              <X size={18} />
+              <X size={17} />
             </button>
+
+            <div className="auth-modal-brand">
+              <span className="brand-mark brand-mark-sm">
+                <Sparkles size={16} />
+              </span>
+              <span className="brand-kicker">SignalForge workspace</span>
+            </div>
 
             <div className="auth-head">
               <h2 id="auth-modal-title">
                 {authMode === 'sign-in'
                   ? 'Sign in to your workspace'
-                  : 'Create your SignalForge account'}
+                  : 'Create your account'}
               </h2>
               <p className="muted-copy">
                 {authMode === 'sign-in'
-                  ? 'Access your projects and continue structured product workflows.'
-                  : 'Start turning feedback into insights, PRDs, and delivery-ready tasks.'}
+                  ? 'Continue where you left off — projects, outputs, and workflow stages stay in sync.'
+                  : 'Start organizing feedback into insights, PRDs, and tasks your team can ship against.'}
               </p>
             </div>
 
             {authError ? (
-              <div className="auth-error-box glass-alert-inline">
-                <strong>Authentication error</strong>
+              <div className="auth-message auth-message-error" role="alert">
+                <strong>Could not authenticate</strong>
                 <p>{authError}</p>
               </div>
             ) : null}
 
             {authNotice && !authError ? (
-              <div className="auth-notice-box">
+              <div className="auth-message auth-message-success" role="status">
                 <p>{authNotice}</p>
               </div>
             ) : null}
 
             <div className="auth-form">
               <div className="field">
-                <label htmlFor="auth-email">Email</label>
+                <label htmlFor="auth-email">Work email</label>
                 <input
                   id="auth-email"
+                  className="input-premium"
                   type="email"
                   autoComplete="email"
                   value={authEmail}
@@ -107,6 +118,7 @@ export function AuthModal({
                 <label htmlFor="auth-password">Password</label>
                 <input
                   id="auth-password"
+                  className="input-premium"
                   type="password"
                   autoComplete={
                     authMode === 'sign-in' ? 'current-password' : 'new-password'

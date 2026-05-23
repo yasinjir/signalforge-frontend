@@ -3,6 +3,7 @@ import {
   ArrowRight,
   FileText,
   FolderKanban,
+  Github,
   Layers3,
   ListChecks,
   LogOut,
@@ -17,13 +18,40 @@ import {
 } from 'lucide-react'
 
 const fadeUp = {
-  initial: { opacity: 0, y: 18 },
+  initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0 },
 }
 
 const stagger = {
-  animate: { transition: { staggerChildren: 0.08 } },
+  animate: { transition: { staggerChildren: 0.1, delayChildren: 0.05 } },
 }
+
+const WORKFLOW_STEPS = [
+  {
+    step: '01',
+    icon: FolderKanban,
+    title: 'Collect feedback',
+    text: 'Gather raw notes, survey responses, and support signals in one structured inbox.',
+  },
+  {
+    step: '02',
+    icon: Layers3,
+    title: 'Generate insights',
+    text: 'Surface themes, pain points, requests, and priority cues your team can act on.',
+  },
+  {
+    step: '03',
+    icon: FileText,
+    title: 'Draft PRD',
+    text: 'Convert validated insight into a clear requirements document ready for review.',
+  },
+  {
+    step: '04',
+    icon: ListChecks,
+    title: 'Prepare tasks',
+    text: 'Break the PRD into user stories, work buckets, and acceptance criteria.',
+  },
+] as const
 
 type MarketingPageProps = {
   isSignedIn: boolean
@@ -44,10 +72,17 @@ export function MarketingPage({
   onSignOut,
   onScrollToWorkflow,
 }: MarketingPageProps) {
+  const primaryCta = isSignedIn ? onOpenWorkspace : onStartWorkspace
+  const primaryLabel = isSignedIn ? 'Open workspace' : 'Start workspace'
+
   return (
     <div className="marketing-page">
       <header className="marketing-nav glass-nav">
-        <button type="button" className="brand" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+        <button
+          type="button"
+          className="brand"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        >
           <span className="brand-mark">
             <Sparkles size={18} />
           </span>
@@ -57,14 +92,14 @@ export function MarketingPage({
           </span>
         </button>
 
-        <nav className="marketing-nav-links">
+        <nav className="marketing-nav-links" aria-label="Primary">
           <a href="#product">Product</a>
           <a href="#workflow">Workflow</a>
           <a href="#use-cases">Use cases</a>
           {isSignedIn ? (
             <>
-              <span className="auth-user-email">{userEmail}</span>
-              <button type="button" className="btn btn-light btn-sm" onClick={onOpenWorkspace}>
+              <span className="nav-user-chip">{userEmail}</span>
+              <button type="button" className="btn btn-dark btn-sm" onClick={onOpenWorkspace}>
                 Open workspace
               </button>
               <button type="button" className="btn-logout" onClick={onSignOut}>
@@ -92,58 +127,103 @@ export function MarketingPage({
           animate="animate"
         >
           <motion.div className="marketing-hero-copy" variants={fadeUp} transition={{ duration: 0.55 }}>
-            <span className="eyebrow glass-eyebrow">Open-source product operations</span>
+            <span className="status-pill">
+              <span className="status-pill-dot" />
+              Open-source product operations platform
+            </span>
+
             <h1 className="hero-title marketing-hero-title">
-              From scattered feedback to execution-ready product work
+              Turn scattered feedback into{' '}
+              <span className="text-gradient">execution-ready</span> product work
             </h1>
-            <p className="hero-subtitle">
-              SignalForge helps teams turn raw product signals into structured insights,
-              reports, PRDs, and delivery-ready tasks.
+
+            <p className="hero-subtitle marketing-hero-subtitle">
+              SignalForge turns scattered product feedback into structured insights,
+              PRDs, and execution-ready tasks — so your team moves from signals to
+              specs with clarity.
             </p>
-            <div className="button-row">
-              <button type="button" className="btn btn-dark" onClick={isSignedIn ? onOpenWorkspace : onStartWorkspace}>
-                {isSignedIn ? 'Open workspace' : 'Start workspace'} <ArrowRight size={16} />
+
+            <div className="button-row hero-cta-row">
+              <button type="button" className="btn btn-dark btn-lg" onClick={primaryCta}>
+                {primaryLabel} <ArrowRight size={16} />
               </button>
-              <button type="button" className="btn btn-glass" onClick={onScrollToWorkflow}>
+              <button type="button" className="btn btn-glass btn-lg" onClick={onScrollToWorkflow}>
                 See workflow
               </button>
             </div>
+
+            <p className="hero-footnote muted-copy">
+              Structured workflow · Authenticated workspaces · Production API
+            </p>
           </motion.div>
 
           <motion.div
-            className="hero-flow-card glass-card"
+            className="hero-visual-stack"
             variants={fadeUp}
-            transition={{ duration: 0.6, delay: 0.1 }}
+            transition={{ duration: 0.65, delay: 0.12 }}
           >
-            <div className="hero-flow-label">Product pipeline preview</div>
-            <div className="hero-flow-steps">
-              {[
-                { label: 'Feedback', icon: MessageSquare },
-                { label: 'Insight', icon: Layers3 },
-                { label: 'PRD', icon: FileText },
-                { label: 'Tasks', icon: ListChecks },
-              ].map((step, index, arr) => (
-                <div key={step.label} className="hero-flow-step-wrap">
-                  <div className="hero-flow-step">
-                    <step.icon size={18} />
-                    <span>{step.label}</span>
+            <div className="hero-visual-glow" aria-hidden />
+            <div className="hero-preview glass-card hero-preview-main">
+              <div className="hero-preview-header">
+                <span className="muted-label">Workspace preview</span>
+                <span className="badge badge-indigo">Live flow</span>
+              </div>
+
+              <div className="hero-preview-pipeline">
+                {[
+                  { label: 'Feedback', icon: MessageSquare },
+                  { label: 'Insight', icon: Layers3 },
+                  { label: 'PRD', icon: FileText },
+                  { label: 'Tasks', icon: ListChecks },
+                ].map((item, index, arr) => (
+                  <div key={item.label} className="hero-preview-pipeline-item">
+                    <div className="hero-preview-pipeline-node">
+                      <item.icon size={16} />
+                      <span>{item.label}</span>
+                    </div>
+                    {index < arr.length - 1 ? (
+                      <div className="hero-preview-pipeline-line" />
+                    ) : null}
                   </div>
-                  {index < arr.length - 1 ? <div className="hero-flow-connector" /> : null}
+                ))}
+              </div>
+
+              <div className="hero-preview-layers">
+                <div className="hero-preview-layer glass-inset hero-preview-layer-back">
+                  <span className="layer-label">Feedback inbox</span>
+                  <p>“Join flow feels heavy” · “Reminders arrive too late” · “Hard to find past sessions”</p>
                 </div>
-              ))}
+                <div className="hero-preview-layer glass-inset hero-preview-layer-mid">
+                  <span className="layer-label">Insight summary</span>
+                  <p>Friction clusters around join flow, reminder timing, and session discoverability.</p>
+                </div>
+                <div className="hero-preview-layer glass-inset hero-preview-layer-front">
+                  <div className="hero-preview-split">
+                    <div>
+                      <span className="layer-label">PRD draft</span>
+                      <p>Problem, goals, scope, and success metrics — ready for review.</p>
+                    </div>
+                    <div>
+                      <span className="layer-label">Task list</span>
+                      <ul className="hero-task-list">
+                        <li>Simplify join flow</li>
+                        <li>Improve reminder rules</li>
+                        <li>Design session hub</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <p className="muted-copy hero-flow-caption">
-              One structured workspace from raw signals to delivery planning.
-            </p>
           </motion.div>
         </motion.section>
 
         <motion.section
           className="trust-strip glass-card"
-          initial={{ opacity: 0, y: 12 }}
+          initial={{ opacity: 0, y: 14 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-40px' }}
-          transition={{ duration: 0.45 }}
+          transition={{ duration: 0.45, ease: 'easeOut' }}
         >
           {[
             { icon: Workflow, label: 'Structured workflow' },
@@ -152,7 +232,9 @@ export function MarketingPage({
             { icon: Rocket, label: 'Production-ready API' },
           ].map((item) => (
             <div key={item.label} className="trust-strip-item">
-              <item.icon size={16} />
+              <span className="trust-strip-icon">
+                <item.icon size={15} />
+              </span>
               <span>{item.label}</span>
             </div>
           ))}
@@ -161,11 +243,15 @@ export function MarketingPage({
         <section id="workflow" className="marketing-section">
           <div className="section-intro">
             <span className="eyebrow">How it works</span>
-            <h2>One workflow from signals to execution</h2>
+            <h2>One repeatable path from signals to delivery</h2>
             <p className="muted-copy section-lead">
-              SignalForge standardizes how product teams collect feedback, synthesize
-              insight, and prepare specs for delivery.
+              Every project follows the same product operations flow — so feedback
+              never gets lost between research, requirements, and execution planning.
             </p>
+          </div>
+
+          <div className="workflow-track" aria-hidden>
+            <div className="workflow-track-line" />
           </div>
 
           <motion.div
@@ -175,29 +261,14 @@ export function MarketingPage({
             whileInView="animate"
             viewport={{ once: true, margin: '-60px' }}
           >
-            {[
-              {
-                icon: FolderKanban,
-                title: 'Collect feedback',
-                text: 'Paste raw feedback, notes, and product inputs into a structured workspace.',
-              },
-              {
-                icon: Layers3,
-                title: 'Generate insights',
-                text: 'Cluster themes, pain points, requests, and priority cues automatically.',
-              },
-              {
-                icon: FileText,
-                title: 'Draft PRD',
-                text: 'Turn validated insight into a standardized product requirements document.',
-              },
-              {
-                icon: ListChecks,
-                title: 'Prepare tasks',
-                text: 'Generate user stories, work buckets, and acceptance criteria for delivery.',
-              },
-            ].map((card) => (
-              <motion.article key={card.title} className="glass-card workflow-card" variants={fadeUp}>
+            {WORKFLOW_STEPS.map((card) => (
+              <motion.article
+                key={card.title}
+                className="glass-card workflow-card"
+                variants={fadeUp}
+                whileHover={{ y: -5, transition: { duration: 0.25 } }}
+              >
+                <span className="workflow-step-num">{card.step}</span>
                 <div className="workflow-card-icon">
                   <card.icon size={20} />
                 </div>
@@ -211,15 +282,19 @@ export function MarketingPage({
         <section id="product" className="marketing-section">
           <div className="section-intro">
             <span className="eyebrow">Product preview</span>
-            <h2>Inside the SignalForge workspace</h2>
+            <h2>A workspace built for product clarity</h2>
+            <p className="muted-copy section-lead">
+              Stage-based navigation, hydrated outputs, and readable panels — designed
+              for day-to-day product work.
+            </p>
           </div>
 
           <motion.div
             className="product-preview-panel glass-card"
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 22 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.55 }}
+            transition={{ duration: 0.55, ease: 'easeOut' }}
           >
             <div className="preview-top">
               <div>
@@ -228,12 +303,12 @@ export function MarketingPage({
                 <p className="muted-copy">Improve discovery, join flow, and reminder experience</p>
               </div>
               <div className="preview-pills">
-                <span className="pill">Insights</span>
+                <span className="pill pill-active-stage">Insights</span>
                 <span className="pill">In progress</span>
               </div>
             </div>
 
-            <div className="preview-tabs">
+            <div className="preview-tabs" role="tablist" aria-label="Workflow stages">
               {['Project', 'Inputs', 'Insights', 'Report', 'PRD', 'Tasks'].map((tab) => (
                 <span
                   key={tab}
@@ -248,9 +323,13 @@ export function MarketingPage({
               <div className="preview-block glass-inset">
                 <strong>Summary insight</strong>
                 <p>
-                  Users value the match experience, but friction appears across join flow,
-                  reminder timing, and session discoverability.
+                  Users value the match experience, but friction appears across join
+                  flow, reminder timing, and session discoverability.
                 </p>
+                <div className="preview-tags">
+                  <span className="badge badge-neutral">Join flow</span>
+                  <span className="badge badge-neutral">Reminders</span>
+                </div>
               </div>
               <div className="preview-block glass-inset">
                 <strong>Execution tasks</strong>
@@ -267,75 +346,128 @@ export function MarketingPage({
         <section id="use-cases" className="marketing-section">
           <div className="section-intro">
             <span className="eyebrow">Use cases</span>
-            <h2>Built for modern product teams</h2>
+            <h2>Where teams use SignalForge</h2>
           </div>
 
-          <div className="grid-2 use-case-grid">
+          <motion.div
+            className="grid-2 use-case-grid"
+            variants={stagger}
+            initial="initial"
+            whileInView="animate"
+            viewport={{ once: true, margin: '-40px' }}
+          >
             {[
               {
                 icon: Target,
                 title: 'Founders validating product ideas',
-                text: 'Turn early feedback into structured themes and a draft PRD without spreadsheet chaos.',
+                text: 'Organize early feedback into themes and a draft PRD without spreadsheet sprawl.',
               },
               {
                 icon: Users,
                 title: 'Product managers organizing feedback',
-                text: 'Standardize how scattered signals become reports, requirements, and planning artifacts.',
+                text: 'Keep research, requirements, and planning artifacts aligned in one workflow.',
               },
               {
                 icon: MessageSquare,
-                title: 'OSS maintainers turning issues into roadmap',
-                text: 'Cluster community signals into actionable insight and execution-ready work.',
+                title: 'OSS maintainers shaping roadmap',
+                text: 'Turn community issues and discussions into structured insight and actionable work.',
               },
               {
                 icon: Rocket,
-                title: 'Teams preparing specs and execution plans',
-                text: 'Move from raw input to PRD and task breakdown in one repeatable workflow.',
+                title: 'Teams preparing specs and delivery plans',
+                text: 'Move from raw input to PRD and task breakdown in a consistent, reviewable format.',
               },
             ].map((item) => (
-              <article key={item.title} className="glass-card use-case-card">
-                <div className="workflow-card-icon">
+              <motion.article
+                key={item.title}
+                className="glass-card use-case-card"
+                variants={fadeUp}
+                whileHover={{ y: -4, transition: { duration: 0.25 } }}
+              >
+                <div className="workflow-card-icon use-case-icon">
                   <item.icon size={20} />
                 </div>
                 <h3>{item.title}</h3>
                 <p>{item.text}</p>
-              </article>
+              </motion.article>
             ))}
-          </div>
+          </motion.div>
         </section>
 
-        <section className="marketing-cta glass-card">
-          <h2>Build product clarity from every signal.</h2>
-          <p className="muted-copy">
-            Open your workspace to create projects, hydrate saved outputs, and run the
-            full SignalForge flow.
-          </p>
-          <div className="button-row">
-            <button type="button" className="btn btn-dark" onClick={isSignedIn ? onOpenWorkspace : onStartWorkspace}>
-              {isSignedIn ? 'Open workspace' : 'Start workspace'}
-            </button>
-            {!isSignedIn ? (
-              <button type="button" className="btn btn-glass" onClick={onSignIn}>
-                Sign in
+        <section className="marketing-cta-wrap">
+          <div className="marketing-cta-glow" aria-hidden />
+          <motion.section
+            className="marketing-cta glass-card"
+            initial={{ opacity: 0, y: 18 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, ease: 'easeOut' }}
+          >
+            <span className="eyebrow glass-eyebrow">Ready when you are</span>
+            <h2>Build product clarity from every signal.</h2>
+            <p className="muted-copy">
+              Create a project, run the full workflow, and return to hydrated outputs
+              whenever you reopen your workspace.
+            </p>
+            <div className="button-row">
+              <button type="button" className="btn btn-dark btn-lg" onClick={primaryCta}>
+                {primaryLabel}
               </button>
-            ) : null}
-          </div>
+              {!isSignedIn ? (
+                <button type="button" className="btn btn-glass btn-lg" onClick={onSignIn}>
+                  Sign in
+                </button>
+              ) : null}
+            </div>
+          </motion.section>
         </section>
       </main>
 
       <footer className="marketing-footer">
         <div className="container-wide marketing-footer-inner">
-          <p>SignalForge — Open-source product operations platform</p>
-          <div className="marketing-footer-links">
-            <a href="https://signalforge-api.vercel.app/api/health" target="_blank" rel="noreferrer">
-              Production API health
-            </a>
-            <a href="https://signalforge-frontend.vercel.app" target="_blank" rel="noreferrer">
-              Live frontend
-            </a>
-            <a href="https://signalforge-api.vercel.app" target="_blank" rel="noreferrer">
-              API
-            </a>
+          <div className="marketing-footer-brand">
+            <span className="brand-mark brand-mark-sm">
+              <Sparkles size={14} />
+            </span>
+            <div>
+              <strong>SignalForge</strong>
+              <p>Open-source product operations platform</p>
+            </div>
+          </div>
+
+          <div className="marketing-footer-columns">
+            <div className="marketing-footer-col">
+              <span className="footer-col-title">Product</span>
+              <a href="#workflow">Workflow</a>
+              <a href="#use-cases">Use cases</a>
+              <a href="https://signalforge-frontend.vercel.app" target="_blank" rel="noreferrer">
+                Live app
+              </a>
+            </div>
+            <div className="marketing-footer-col">
+              <span className="footer-col-title">Developers</span>
+              <a
+                href="https://github.com/yasinjir/signalforge-frontend"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <Github size={14} /> GitHub Frontend
+              </a>
+              <a
+                href="https://github.com/yasinjir/signalforge-api"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <Github size={14} /> GitHub API
+              </a>
+              <a
+                href="https://signalforge-api.vercel.app/api/health"
+                target="_blank"
+                rel="noreferrer"
+              >
+                API health
+              </a>
+            </div>
           </div>
         </div>
       </footer>

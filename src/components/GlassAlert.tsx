@@ -1,4 +1,4 @@
-import { AlertCircle } from 'lucide-react'
+import { Info } from 'lucide-react'
 
 export function GlassAlert({
   message,
@@ -12,10 +12,10 @@ export function GlassAlert({
   return (
     <div className="glass-alert" role="alert">
       <div className="glass-alert-icon">
-        <AlertCircle size={18} />
+        <Info size={18} />
       </div>
       <div className="glass-alert-body">
-        <strong>Something went wrong</strong>
+        <strong>Action needed</strong>
         <p>{message}</p>
       </div>
       <div className="glass-alert-actions">

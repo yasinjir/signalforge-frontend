@@ -259,6 +259,10 @@ function AppTopNav({
   onLogout: () => void
   userEmail?: string
 }) {
+  const initials = userEmail
+    ? userEmail.slice(0, 2).toUpperCase()
+    : 'SF'
+
   return (
     <header className="topbar glass-nav app-topbar">
       <button type="button" className="brand" onClick={onGoProjects}>
@@ -272,14 +276,17 @@ function AppTopNav({
       </button>
 
       <nav className="top-links top-links-auth">
-        <button type="button" onClick={onBackToSite}>
+        <button type="button" className="nav-text-btn" onClick={onBackToSite}>
           Website
         </button>
-        <button type="button" onClick={onGoProjects}>
+        <button type="button" className="nav-text-btn nav-text-btn-active" onClick={onGoProjects}>
           Projects
         </button>
         {userEmail ? (
-          <span className="auth-user-email">{userEmail}</span>
+          <div className="user-menu-chip" title={userEmail}>
+            <span className="user-menu-avatar">{initials}</span>
+            <span className="auth-user-email">{userEmail}</span>
+          </div>
         ) : null}
         <button type="button" className="btn-logout" onClick={onLogout}>
           <LogOut size={15} /> Sign out
@@ -331,6 +338,10 @@ function StepShell({
   isDemoMode?: boolean
   children: React.ReactNode
 }) {
+  const stageIndex = steps.indexOf(project.stage)
+  const progressPercent =
+    stageIndex >= 0 ? ((stageIndex + 1) / steps.length) * 100 : 0
+
   return (
     <div className="step-shell">
       {isDemoMode ? (
@@ -343,7 +354,7 @@ function StepShell({
         </div>
       ) : null}
 
-      <div className="project-bar glass-card">
+      <div className="project-bar glass-card project-bar-premium">
         <div className="project-bar-top">
           <div>
             <div className="muted-label">Current project</div>
@@ -352,28 +363,42 @@ function StepShell({
           </div>
 
           <div className="pill-row">
+            <span className="pill pill-stage">{project.stage}</span>
             <span className="pill">{project.status}</span>
-            <span className="pill">Last updated {project.updated}</span>
+            <span className="pill pill-muted">Updated {project.updated}</span>
           </div>
         </div>
 
-        <div className="workflow-nav">
+        <div className="workflow-progress" aria-hidden>
+          <div className="workflow-progress-track">
+            <div
+              className="workflow-progress-fill"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="workflow-nav workflow-nav-scroll">
           {steps.map((step, index) => {
             const active = view === step
+            const completed = steps.indexOf(project.stage) > index
             const enabled = steps.indexOf(project.stage) >= index || active
 
             return (
               <button
                 key={step}
+                type="button"
                 onClick={() => enabled && onStepClick(step)}
-                className={
-                  active
-                    ? 'step-btn step-btn-active'
-                    : enabled
-                      ? 'step-btn'
-                      : 'step-btn step-btn-disabled'
-                }
+                className={[
+                  'step-btn',
+                  active ? 'step-btn-active' : '',
+                  completed ? 'step-btn-complete' : '',
+                  !enabled ? 'step-btn-disabled' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
               >
+                <span className="step-btn-index">{index + 1}</span>
                 {step}
               </button>
             )
@@ -396,7 +421,7 @@ function SectionCard({
   children: React.ReactNode
 }) {
   return (
-    <section className="glass-card section-card">
+    <section className="glass-card section-card content-panel">
       <div className="section-head">
         <h3>{title}</h3>
         {description ? <p>{description}</p> : null}
@@ -409,7 +434,7 @@ function SectionCard({
 
 function ListBlock({ title, items }: { title: string; items: string[] }) {
   return (
-    <div className="list-block">
+    <div className="list-block glass-inset">
       <h4>{title}</h4>
       <ul>
         {items.map((item) => (
@@ -933,6 +958,7 @@ export default function App() {
   if (shellMode === 'marketing') {
     return (
       <div className="app-bg marketing-bg">
+        <div className="ambient-gradient" aria-hidden />
         <div className="bg-orb orb-one" />
         <div className="bg-orb orb-two" />
         <div className="bg-orb orb-three" />
@@ -978,6 +1004,7 @@ export default function App() {
 
   return (
     <div className="app-bg app-shell-bg">
+      <div className="ambient-gradient" aria-hidden />
       <div className="bg-orb orb-one" />
       <div className="bg-orb orb-two" />
       <div className="bg-orb orb-three" />
@@ -1008,14 +1035,13 @@ export default function App() {
           >
             {view === 'projects' && (
               <div className="stack-lg">
-                <section className="glass-card header-card">
+                <section className="glass-card header-card dashboard-header">
                   <div>
-                    <div className="muted-label">Projects</div>
-                    <h2>Manage active product workflows</h2>
+                    <div className="muted-label">Your workspace</div>
+                    <h2>Projects</h2>
                     <p className="muted-copy wide-copy">
-                      Create a project, resume the latest stage, or continue an
-                      existing workflow from feedback to PRD and execution-ready
-                      tasks.
+                      Each project tracks your path from raw feedback to insights,
+                      report, PRD, and execution-ready tasks.
                     </p>
                   </div>
 
@@ -1058,18 +1084,24 @@ export default function App() {
                 </section>
 
                 {isLoading && projects.length === 0 ? (
-                  <section className="glass-card section-card">
-                    <p className="muted-copy">Loading projects from backend...</p>
+                  <section className="glass-card section-card loading-state-card">
+                    <div className="loading-bar loading-bar-inline" aria-hidden>
+                      <span className="loading-bar-fill loading-bar-fill-static" />
+                    </div>
+                    <p className="muted-copy">Loading your projects...</p>
                   </section>
                 ) : null}
 
                 {projects.length === 0 && !isLoading ? (
-                  <section className="glass-card section-card empty-state-card">
+                  <section className="glass-card section-card empty-state-card empty-state-premium">
+                    <div className="empty-state-icon">
+                      <Sparkles size={22} />
+                    </div>
                     <div className="section-head">
                       <h3>No projects yet</h3>
                       <p>
-                        Create your first workspace to turn feedback into insights,
-                        PRDs, and tasks.
+                        Create your first workspace to turn feedback into structured
+                        insights, a report, PRD, and delivery-ready tasks.
                       </p>
                     </div>
 
@@ -1098,11 +1130,11 @@ export default function App() {
                     {projects.map((project) => (
                       <motion.article
                         key={project.id}
-                        className="glass-card project-card"
-                        whileHover={{ y: -4, transition: { duration: 0.25 } }}
+                        className="glass-card project-card project-card-premium"
+                        whileHover={{ y: -6, transition: { duration: 0.28, ease: 'easeOut' } }}
                       >
                         <div className="tag-row">
-                          <span className="badge badge-neutral">{project.stage}</span>
+                          <span className="badge badge-indigo">{project.stage}</span>
                           <span className="badge badge-green">{project.status}</span>
                         </div>
 
