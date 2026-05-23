@@ -1,7 +1,9 @@
 {
   "name": "signalforge-prototype",
+  "description": "SignalForge product operations platform: feedback to insights, PRDs, and execution-ready tasks.",
   "private": true,
   "version": "0.1.0",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",

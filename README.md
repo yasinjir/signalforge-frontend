@@ -1,8 +1,16 @@
 # SignalForge Frontend
 
-A product operations interface for converting raw feedback into insights, reports, PRDs, and execution-ready tasks.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+An **open-source** product operations interface for converting raw feedback into insights, reports, PRDs, and execution-ready tasks.
 
 SignalForge gives product teams one structured workflow: collect inputs, generate insight, produce a report and PRD, and prepare execution-ready tasks for delivery planning.
+
+## Open-source status
+
+SignalForge is being developed as an open-source product operations platform.
+
+This repository is the frontend application, released under the [MIT License](LICENSE). Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). For security concerns, see [SECURITY.md](SECURITY.md). All participants are expected to follow our [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Tech stack
 
