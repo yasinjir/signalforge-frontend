@@ -21,9 +21,14 @@ import {
 } from './lib/api'
 import { supabase } from './lib/supabase'
 import { AuthModal, type AuthMode } from './components/AuthModal'
+import { EditProjectModal, type EditProjectForm } from './components/EditProjectModal'
 import { GlassAlert } from './components/GlassAlert'
 import { LoadingScreen } from './components/LoadingScreen'
 import { MarketingPage } from './components/MarketingPage'
+import {
+  ProjectsDashboard,
+  type ProjectFilters,
+} from './components/ProjectsDashboard'
 
 type Step = 'Project' | 'Inputs' | 'Insights' | 'Report' | 'PRD' | 'Tasks'
 type View = 'projects' | Step | 'complete'
@@ -41,6 +46,22 @@ type Project = {
 }
 
 const steps: Step[] = ['Project', 'Inputs', 'Insights', 'Report', 'PRD', 'Tasks']
+
+const DEFAULT_PROJECT_FILTERS: ProjectFilters = {
+  search: '',
+  stage: 'All',
+  status: 'All',
+  includeArchived: false,
+}
+
+function toListProjectsParams(filters: ProjectFilters) {
+  return {
+    search: filters.search.trim() || undefined,
+    stage: filters.stage !== 'All' ? filters.stage : undefined,
+    status: filters.status !== 'All' ? filters.status : undefined,
+    includeArchived: filters.includeArchived || undefined,
+  }
+}
 
 const DEMO_PROJECT_ID = 'demo-local'
 
@@ -465,6 +486,19 @@ export default function App() {
   const [apiError, setApiError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [openingProjectId, setOpeningProjectId] = useState<string | null>(null)
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null)
+  const [archivingProjectId, setArchivingProjectId] = useState<string | null>(null)
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null)
+  const [projectFilters, setProjectFilters] =
+    useState<ProjectFilters>(DEFAULT_PROJECT_FILTERS)
+  const [editProjectId, setEditProjectId] = useState<string | null>(null)
+  const [editProjectForm, setEditProjectForm] = useState<EditProjectForm>({
+    name: '',
+    initiative: '',
+    context: '',
+    goal: '',
+  })
+  const [isSavingProjectEdit, setIsSavingProjectEdit] = useState(false)
 
   const [inputText, setInputText] = useState(sampleInput)
 
@@ -541,6 +575,15 @@ export default function App() {
     criteria: apiTasks?.acceptanceCriteria ?? tasksData.criteria,
   }
 
+  const hasActiveProjectFilters = useMemo(
+    () =>
+      projectFilters.search.trim() !== '' ||
+      projectFilters.stage !== 'All' ||
+      projectFilters.status !== 'All' ||
+      projectFilters.includeArchived,
+    [projectFilters],
+  )
+
   useEffect(() => {
     setAccessTokenProvider(async () => {
       const {
@@ -587,19 +630,34 @@ export default function App() {
     }
   }, [authLoading, shellMode, session])
 
-  function clearProductState() {
-    setProjects([])
-    setCurrentProjectId(null)
-    setIsDemoMode(false)
+  function clearWorkspaceOutputs() {
     setApiInsight(null)
     setApiReport(null)
     setApiTasks(null)
     setPrd(defaultPrd)
     setInputText(sampleInput)
+  }
+
+  function clearProductState() {
+    setProjects([])
+    setCurrentProjectId(null)
+    setIsDemoMode(false)
+    clearWorkspaceOutputs()
     setApiError(null)
     setView('projects')
     setOpeningProjectId(null)
+    setEditingProjectId(null)
+    setArchivingProjectId(null)
+    setDeletingProjectId(null)
+    setEditProjectId(null)
+    setProjectFilters(DEFAULT_PROJECT_FILTERS)
     setIsLoading(false)
+  }
+
+  function leaveCurrentProject() {
+    setCurrentProjectId(null)
+    clearWorkspaceOutputs()
+    setView('projects')
   }
 
   function openAuthModal(mode: AuthMode = 'sign-in') {
@@ -698,29 +756,137 @@ export default function App() {
     setAuthModalOpen(false)
   }
 
-  async function loadProjectsFromApi() {
+  async function loadProjectsFromApi(filtersOverride?: ProjectFilters) {
     if (isLoading || !session) return
+
+    const filters = filtersOverride ?? projectFilters
 
     try {
       setIsLoading(true)
       setApiError(null)
 
-      const data = await api.listProjects()
+      const data = await api.listProjects(toListProjectsParams(filters))
+      const mappedProjects = data.map(mapApiProject)
+      setProjects(mappedProjects)
       setApiError(null)
+      setIsDemoMode(false)
 
-      if (data.length > 0) {
-        const mappedProjects = data.map(mapApiProject)
-        setProjects(mappedProjects)
-        setCurrentProjectId(mappedProjects[0].id)
-        setIsDemoMode(false)
-      } else {
-        setProjects([])
-        setCurrentProjectId(null)
+      if (
+        currentProjectId &&
+        !mappedProjects.some((project) => project.id === currentProjectId)
+      ) {
+        leaveCurrentProject()
       }
     } catch (error) {
       setApiError(resolveApiError(error, 'Could not load projects from backend.'))
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  function clearProjectFilters() {
+    setProjectFilters(DEFAULT_PROJECT_FILTERS)
+    void loadProjectsFromApi(DEFAULT_PROJECT_FILTERS)
+  }
+
+  function openEditProject(project: Project) {
+    setEditProjectId(project.id)
+    setEditProjectForm({
+      name: project.name,
+      initiative: project.initiative,
+      context: project.context ?? '',
+      goal: project.goal ?? '',
+    })
+  }
+
+  function closeEditProject() {
+    if (isSavingProjectEdit) return
+    setEditProjectId(null)
+  }
+
+  async function saveEditProject() {
+    if (!editProjectId || !editProjectForm.name.trim()) return
+
+    try {
+      setIsSavingProjectEdit(true)
+      setEditingProjectId(editProjectId)
+      setApiError(null)
+
+      const updated = await api.updateProject(editProjectId, {
+        name: editProjectForm.name.trim(),
+        initiative: editProjectForm.initiative,
+        backgroundContext: editProjectForm.context,
+        analysisGoal: editProjectForm.goal,
+      })
+
+      const mapped = mapApiProject(updated)
+      setProjects((prev) =>
+        prev.map((project) => (project.id === mapped.id ? mapped : project)),
+      )
+      setApiError(null)
+      setEditProjectId(null)
+      flashCopy('Project updated')
+    } catch (error) {
+      setApiError(resolveApiError(error, 'Failed to update project.'))
+    } finally {
+      setIsSavingProjectEdit(false)
+      setEditingProjectId(null)
+    }
+  }
+
+  async function handleArchiveProject(project: Project) {
+    if (
+      !window.confirm(
+        'Archive this project? You can include archived projects later from filters.',
+      )
+    ) {
+      return
+    }
+
+    try {
+      setArchivingProjectId(project.id)
+      setApiError(null)
+
+      await api.archiveProject(project.id)
+
+      if (currentProjectId === project.id) {
+        leaveCurrentProject()
+      }
+
+      await loadProjectsFromApi()
+      flashCopy('Project archived')
+    } catch (error) {
+      setApiError(resolveApiError(error, 'Failed to archive project.'))
+    } finally {
+      setArchivingProjectId(null)
+    }
+  }
+
+  async function handleDeleteProject(project: Project) {
+    if (
+      !window.confirm(
+        'Delete this project and all generated outputs? This cannot be undone.',
+      )
+    ) {
+      return
+    }
+
+    try {
+      setDeletingProjectId(project.id)
+      setApiError(null)
+
+      await api.deleteProject(project.id)
+
+      if (currentProjectId === project.id) {
+        leaveCurrentProject()
+      }
+
+      setProjects((prev) => prev.filter((item) => item.id !== project.id))
+      flashCopy('Project deleted')
+    } catch (error) {
+      setApiError(resolveApiError(error, 'Failed to delete project.'))
+    } finally {
+      setDeletingProjectId(null)
     }
   }
 
@@ -1034,140 +1200,32 @@ export default function App() {
             transition={{ duration: 0.35, ease: 'easeOut' }}
           >
             {view === 'projects' && (
-              <div className="stack-lg">
-                <section className="glass-card header-card dashboard-header">
-                  <div>
-                    <div className="muted-label">Your workspace</div>
-                    <h2>Projects</h2>
-                    <p className="muted-copy wide-copy">
-                      Each project tracks your path from raw feedback to insights,
-                      report, PRD, and execution-ready tasks.
-                    </p>
-                  </div>
-
-                  <div className="button-row">
-                    <button
-                      className="btn btn-dark"
-                      onClick={() => {
-                        setIsDemoMode(false)
-                        setView('Project')
-                      }}
-                      disabled={isLoading}
-                    >
-                      <Plus size={16} /> Create project
-                    </button>
-
-                    {projects.length > 0 ? (
-                      <button
-                        className="btn btn-light"
-                        onClick={() => void openProject(projects[0])}
-                        disabled={isLoading}
-                      >
-                        {openingProjectId === projects[0].id
-                          ? 'Opening...'
-                          : 'Resume latest project'}
-                      </button>
-                    ) : null}
-
-                    <button
-                      className="btn btn-light"
-                      onClick={loadProjectsFromApi}
-                      disabled={isLoading}
-                    >
-                      {isLoading && !openingProjectId
-                        ? projects.length === 0
-                          ? 'Loading...'
-                          : 'Syncing...'
-                        : 'Sync backend projects'}
-                    </button>
-                  </div>
-                </section>
-
-                {isLoading && projects.length === 0 ? (
-                  <section className="glass-card section-card loading-state-card">
-                    <div className="loading-bar loading-bar-inline" aria-hidden>
-                      <span className="loading-bar-fill loading-bar-fill-static" />
-                    </div>
-                    <p className="muted-copy">Loading your projects...</p>
-                  </section>
-                ) : null}
-
-                {projects.length === 0 && !isLoading ? (
-                  <section className="glass-card section-card empty-state-card empty-state-premium">
-                    <div className="empty-state-icon">
-                      <Sparkles size={22} />
-                    </div>
-                    <div className="section-head">
-                      <h3>No projects yet</h3>
-                      <p>
-                        Create your first workspace to turn feedback into structured
-                        insights, a report, PRD, and delivery-ready tasks.
-                      </p>
-                    </div>
-
-                    <div className="button-row stack-top-lg">
-                      <button
-                        className="btn btn-dark"
-                        onClick={() => {
-                          setIsDemoMode(false)
-                          setView('Project')
-                        }}
-                      >
-                        <Plus size={16} /> Create project
-                      </button>
-
-                      <button
-                        className="btn btn-light"
-                        onClick={loadProjectsFromApi}
-                        disabled={isLoading}
-                      >
-                        Sync backend projects
-                      </button>
-                    </div>
-                  </section>
-                ) : (
-                  <section className="grid-3">
-                    {projects.map((project) => (
-                      <motion.article
-                        key={project.id}
-                        className="glass-card project-card project-card-premium"
-                        whileHover={{ y: -6, transition: { duration: 0.28, ease: 'easeOut' } }}
-                      >
-                        <div className="tag-row">
-                          <span className="badge badge-indigo">{project.stage}</span>
-                          <span className="badge badge-green">{project.status}</span>
-                        </div>
-
-                        <h3>{project.name}</h3>
-                        <p>{project.initiative}</p>
-
-                        <div className="small-copy">Last updated {project.updated}</div>
-
-                        <div className="button-row">
-                          <button
-                            className="btn btn-dark"
-                            onClick={() => void openProject(project)}
-                            disabled={isLoading}
-                          >
-                            {openingProjectId === project.id
-                              ? 'Opening...'
-                              : 'Open project'}
-                          </button>
-                          <button
-                            className="btn btn-light"
-                            onClick={() => void openProject(project)}
-                            disabled={isLoading}
-                          >
-                            {openingProjectId === project.id
-                              ? 'Opening...'
-                              : 'Continue'}
-                          </button>
-                        </div>
-                      </motion.article>
-                    ))}
-                  </section>
-                )}
-              </div>
+              <ProjectsDashboard
+                projects={projects}
+                filters={projectFilters}
+                hasActiveFilters={hasActiveProjectFilters}
+                isLoading={isLoading}
+                openingProjectId={openingProjectId}
+                editingProjectId={editingProjectId}
+                archivingProjectId={archivingProjectId}
+                deletingProjectId={deletingProjectId}
+                onFiltersChange={setProjectFilters}
+                onApplyFilters={() => void loadProjectsFromApi()}
+                onClearFilters={clearProjectFilters}
+                onCreateProject={() => {
+                  setIsDemoMode(false)
+                  setView('Project')
+                }}
+                onOpenProject={(project) => void openProject(project as Project)}
+                onEditProject={(p) => openEditProject(p as Project)}
+                onArchiveProject={(project) =>
+                  void handleArchiveProject(project as Project)
+                }
+                onDeleteProject={(project) =>
+                  void handleDeleteProject(project as Project)
+                }
+                onSync={() => void loadProjectsFromApi()}
+              />
             )}
 
             {view === 'Project' && (
@@ -1650,6 +1708,15 @@ export default function App() {
           </motion.div>
         </AnimatePresence>
       </main>
+
+      <EditProjectModal
+        open={editProjectId !== null}
+        form={editProjectForm}
+        isSaving={isSavingProjectEdit}
+        onClose={closeEditProject}
+        onChange={setEditProjectForm}
+        onSave={() => void saveEditProject()}
+      />
 
       {copied ? (
         <div className="toast">

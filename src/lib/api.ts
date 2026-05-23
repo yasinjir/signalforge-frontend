@@ -1,6 +1,4 @@
 // Backend/product backlog (see README.md and docs/DEPLOYMENT.md):
-// 3. Multi-user access — per-user project lists after auth
-// 4. DELETE /projects/:id or PATCH archive
 // 5. Better error UI — toast, inline retry, error types
 // 7. Real LLM pipeline for insights/report/PRD/tasks generation
 
@@ -150,9 +148,54 @@ export type Workspace = {
   latestTasks: TaskRun | null;
 };
 
+export type UpdateProjectInput = {
+  name?: string;
+  initiative?: string;
+  backgroundContext?: string;
+  analysisGoal?: string;
+  status?: string;
+};
+
+export type DeleteProjectResponse = {
+  deleted: boolean;
+  id: string;
+};
+
+export type ListProjectsParams = {
+  search?: string;
+  stage?: string;
+  status?: string;
+  includeArchived?: boolean;
+};
+
+function buildProjectsQuery(params?: ListProjectsParams): string {
+  if (!params) return '';
+
+  const query = new URLSearchParams();
+
+  if (params.search?.trim()) {
+    query.set('search', params.search.trim());
+  }
+
+  if (params.stage?.trim()) {
+    query.set('stage', params.stage.trim());
+  }
+
+  if (params.status?.trim()) {
+    query.set('status', params.status.trim());
+  }
+
+  if (params.includeArchived) {
+    query.set('includeArchived', 'true');
+  }
+
+  const qs = query.toString();
+  return qs ? `?${qs}` : '';
+}
+
 export const api = {
-  listProjects() {
-    return request<Project[]>('/projects');
+  listProjects(params?: ListProjectsParams) {
+    return request<Project[]>(`/projects${buildProjectsQuery(params)}`);
   },
 
   getWorkspace(projectId: string) {
@@ -168,6 +211,25 @@ export const api = {
     return request<Project>('/projects', {
       method: 'POST',
       body: JSON.stringify(data),
+    });
+  },
+
+  updateProject(projectId: string, data: UpdateProjectInput) {
+    return request<Project>(`/projects/${projectId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  archiveProject(projectId: string) {
+    return request<Project>(`/projects/${projectId}/archive`, {
+      method: 'PATCH',
+    });
+  },
+
+  deleteProject(projectId: string) {
+    return request<DeleteProjectResponse>(`/projects/${projectId}`, {
+      method: 'DELETE',
     });
   },
 
