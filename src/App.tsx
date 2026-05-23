@@ -2,14 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  ArrowRight,
-  CheckCircle2,
   ChevronRight,
   ClipboardCheck,
-  FileText,
-  FolderKanban,
-  Layers3,
-  ListChecks,
   LogOut,
   Plus,
   Sparkles,
@@ -26,9 +20,14 @@ import {
   Workspace,
 } from './lib/api'
 import { supabase } from './lib/supabase'
+import { AuthModal, type AuthMode } from './components/AuthModal'
+import { GlassAlert } from './components/GlassAlert'
+import { LoadingScreen } from './components/LoadingScreen'
+import { MarketingPage } from './components/MarketingPage'
 
 type Step = 'Project' | 'Inputs' | 'Insights' | 'Report' | 'PRD' | 'Tasks'
-type View = 'landing' | 'projects' | Step | 'complete'
+type View = 'projects' | Step | 'complete'
+type ShellMode = 'marketing' | 'app'
 
 type Project = {
   id: string
@@ -249,164 +248,44 @@ function mapPrd(apiPrd: Prd) {
   }
 }
 
-type AuthMode = 'sign-in' | 'sign-up'
-
-function TopNav({
-  onGoLanding,
+function AppTopNav({
   onGoProjects,
+  onBackToSite,
   onLogout,
   userEmail,
 }: {
-  onGoLanding: () => void
   onGoProjects: () => void
+  onBackToSite: () => void
   onLogout: () => void
   userEmail?: string
 }) {
   return (
-    <header className="topbar">
-      <button className="brand" onClick={onGoLanding}>
+    <header className="topbar glass-nav app-topbar">
+      <button type="button" className="brand" onClick={onGoProjects}>
         <span className="brand-mark">
           <Sparkles size={18} />
         </span>
         <span>
-          <span className="brand-kicker">Product operations platform</span>
+          <span className="brand-kicker">Workspace</span>
           <span className="brand-name">SignalForge</span>
         </span>
       </button>
 
       <nav className="top-links top-links-auth">
-        <button onClick={onGoLanding}>Overview</button>
-        <button onClick={onGoProjects}>Projects</button>
+        <button type="button" onClick={onBackToSite}>
+          Website
+        </button>
+        <button type="button" onClick={onGoProjects}>
+          Projects
+        </button>
         {userEmail ? (
           <span className="auth-user-email">{userEmail}</span>
         ) : null}
-        <button className="btn-logout" onClick={onLogout}>
+        <button type="button" className="btn-logout" onClick={onLogout}>
           <LogOut size={15} /> Sign out
         </button>
       </nav>
     </header>
-  )
-}
-
-function AuthScreen({
-  authMode,
-  authEmail,
-  authPassword,
-  authError,
-  isSubmitting,
-  onEmailChange,
-  onPasswordChange,
-  onSignIn,
-  onSignUp,
-  onToggleMode,
-}: {
-  authMode: AuthMode
-  authEmail: string
-  authPassword: string
-  authError: string | null
-  isSubmitting: boolean
-  onEmailChange: (value: string) => void
-  onPasswordChange: (value: string) => void
-  onSignIn: () => void
-  onSignUp: () => void
-  onToggleMode: () => void
-}) {
-  return (
-    <div className="auth-screen">
-      <div className="auth-card card">
-        <div className="auth-brand">
-          <span className="brand-mark">
-            <Sparkles size={18} />
-          </span>
-          <div>
-            <span className="brand-kicker">Product operations platform</span>
-            <span className="brand-name">SignalForge</span>
-          </div>
-        </div>
-
-        <div className="auth-head">
-          <h1>{authMode === 'sign-in' ? 'Sign in' : 'Create account'}</h1>
-          <p className="muted-copy">
-            {authMode === 'sign-in'
-              ? 'Access your projects and continue product workflows.'
-              : 'Create an account to start turning feedback into insights, PRDs, and tasks.'}
-          </p>
-        </div>
-
-        {authError ? (
-          <div className="auth-error-box">
-            <strong>Authentication error</strong>
-            <p>{authError}</p>
-          </div>
-        ) : null}
-
-        <div className="auth-form">
-          <div className="field">
-            <label htmlFor="auth-email">Email</label>
-            <input
-              id="auth-email"
-              type="email"
-              autoComplete="email"
-              value={authEmail}
-              onChange={(event) => onEmailChange(event.target.value)}
-              placeholder="you@company.com"
-            />
-          </div>
-
-          <div className="field stack-top">
-            <label htmlFor="auth-password">Password</label>
-            <input
-              id="auth-password"
-              type="password"
-              autoComplete={
-                authMode === 'sign-in' ? 'current-password' : 'new-password'
-              }
-              value={authPassword}
-              onChange={(event) => onPasswordChange(event.target.value)}
-              placeholder="Enter your password"
-            />
-          </div>
-
-          <div className="button-row stack-top-lg">
-            {authMode === 'sign-in' ? (
-              <button
-                className="btn btn-dark"
-                onClick={onSignIn}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? 'Signing in...' : 'Sign in'}
-              </button>
-            ) : (
-              <button
-                className="btn btn-dark"
-                onClick={onSignUp}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? 'Creating account...' : 'Create account'}
-              </button>
-            )}
-          </div>
-
-          <div className="auth-toggle">
-            {authMode === 'sign-in' ? (
-              <p>
-                New to SignalForge?{' '}
-                <button type="button" onClick={onToggleMode}>
-                  Create an account
-                </button>
-              </p>
-            ) : (
-              <p>
-                Already have an account?{' '}
-                <button type="button" onClick={onToggleMode}>
-                  Sign in
-                </button>
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
   )
 }
 
@@ -418,7 +297,7 @@ function NoProjectPrompt({
   onGoProjects: () => void
 }) {
   return (
-    <section className="card section-card">
+    <section className="glass-card section-card">
       <div className="section-head">
         <h3>Create a project first</h3>
         <p>
@@ -455,7 +334,7 @@ function StepShell({
   return (
     <div className="step-shell">
       {isDemoMode ? (
-        <div className="card demo-banner">
+        <div className="glass-card demo-banner">
           <strong>Demo preview</strong>
           <p className="muted-copy">
             Sample content only. Create a project and sync with the backend to
@@ -464,7 +343,7 @@ function StepShell({
         </div>
       ) : null}
 
-      <div className="project-bar card">
+      <div className="project-bar glass-card">
         <div className="project-bar-top">
           <div>
             <div className="muted-label">Current project</div>
@@ -517,7 +396,7 @@ function SectionCard({
   children: React.ReactNode
 }) {
   return (
-    <section className="card section-card">
+    <section className="glass-card section-card">
       <div className="section-head">
         <h3>{title}</h3>
         {description ? <p>{description}</p> : null}
@@ -548,9 +427,12 @@ export default function App() {
   const [authPassword, setAuthPassword] = useState('')
   const [authMode, setAuthMode] = useState<AuthMode>('sign-in')
   const [authError, setAuthError] = useState<string | null>(null)
+  const [authNotice, setAuthNotice] = useState<string | null>(null)
   const [isAuthSubmitting, setIsAuthSubmitting] = useState(false)
+  const [authModalOpen, setAuthModalOpen] = useState(false)
+  const [shellMode, setShellMode] = useState<ShellMode>('marketing')
 
-  const [view, setView] = useState<View>('landing')
+  const [view, setView] = useState<View>('projects')
   const [projects, setProjects] = useState<Project[]>([])
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
   const [isDemoMode, setIsDemoMode] = useState(false)
@@ -654,6 +536,8 @@ export default function App() {
       setAuthLoading(false)
       if (!nextSession) {
         clearProductState()
+        setShellMode('marketing')
+        setAuthModalOpen(false)
       }
     })
 
@@ -663,10 +547,20 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (session?.user?.id) {
+    if (shellMode === 'app' && session?.user?.id) {
       void loadProjectsFromApi()
     }
-  }, [session?.user?.id])
+  }, [shellMode, session?.user?.id])
+
+  useEffect(() => {
+    if (!authLoading && shellMode === 'app' && !session) {
+      setShellMode('marketing')
+      setAuthMode('sign-in')
+      setAuthError(null)
+      setAuthNotice(null)
+      setAuthModalOpen(true)
+    }
+  }, [authLoading, shellMode, session])
 
   function clearProductState() {
     setProjects([])
@@ -678,9 +572,39 @@ export default function App() {
     setPrd(defaultPrd)
     setInputText(sampleInput)
     setApiError(null)
-    setView('landing')
+    setView('projects')
     setOpeningProjectId(null)
     setIsLoading(false)
+  }
+
+  function openAuthModal(mode: AuthMode = 'sign-in') {
+    setAuthMode(mode)
+    setAuthError(null)
+    setAuthNotice(null)
+    setAuthModalOpen(true)
+  }
+
+  function closeAuthModal() {
+    if (isAuthSubmitting) return
+    setAuthModalOpen(false)
+    setAuthError(null)
+    setAuthNotice(null)
+  }
+
+  function enterAppWorkspace() {
+    if (!session) {
+      openAuthModal('sign-in')
+      return
+    }
+
+    setShellMode('app')
+    setView('projects')
+    void loadProjectsFromApi()
+  }
+
+  function returnToMarketing() {
+    setShellMode('marketing')
+    setApiError(null)
   }
 
   function resolveApiError(error: unknown, fallback: string) {
@@ -695,15 +619,20 @@ export default function App() {
 
   async function handleSignIn() {
     setAuthError(null)
+    setAuthNotice(null)
     setIsAuthSubmitting(true)
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: authEmail.trim(),
       password: authPassword,
     })
 
     if (error) {
       setAuthError(error.message)
+    } else if (data.session) {
+      setAuthModalOpen(false)
+      setShellMode('app')
+      setView('projects')
     }
 
     setIsAuthSubmitting(false)
@@ -711,17 +640,22 @@ export default function App() {
 
   async function handleSignUp() {
     setAuthError(null)
+    setAuthNotice(null)
     setIsAuthSubmitting(true)
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: authEmail.trim(),
       password: authPassword,
     })
 
     if (error) {
       setAuthError(error.message)
+    } else if (data.session) {
+      setAuthModalOpen(false)
+      setShellMode('app')
+      setView('projects')
     } else {
-      setAuthError(
+      setAuthNotice(
         'Account created. Check your email if confirmation is required, then sign in.',
       )
       setAuthMode('sign-in')
@@ -732,7 +666,11 @@ export default function App() {
 
   async function handleSignOut() {
     setAuthError(null)
+    setAuthNotice(null)
     await supabase.auth.signOut()
+    clearProductState()
+    setShellMode('marketing')
+    setAuthModalOpen(false)
   }
 
   async function loadProjectsFromApi() {
@@ -989,39 +927,44 @@ export default function App() {
   }
 
   if (authLoading) {
-    return (
-      <div className="app-bg auth-loading-screen">
-        <div className="bg-orb orb-one" />
-        <div className="bg-orb orb-two" />
-        <div className="bg-orb orb-three" />
-        <div className="auth-loading-card card">
-          <span className="brand-mark auth-loading-mark">
-            <Sparkles size={18} />
-          </span>
-          <p className="muted-copy">Loading session...</p>
-        </div>
-      </div>
-    )
+    return <LoadingScreen />
   }
 
-  if (!session) {
+  if (shellMode === 'marketing') {
     return (
-      <div className="app-bg">
+      <div className="app-bg marketing-bg">
         <div className="bg-orb orb-one" />
         <div className="bg-orb orb-two" />
         <div className="bg-orb orb-three" />
-        <AuthScreen
+
+        <MarketingPage
+          isSignedIn={Boolean(session)}
+          userEmail={session?.user.email ?? undefined}
+          onStartWorkspace={() => openAuthModal('sign-in')}
+          onOpenWorkspace={enterAppWorkspace}
+          onSignIn={() => openAuthModal('sign-in')}
+          onSignOut={() => void handleSignOut()}
+          onScrollToWorkflow={() => {
+            document.getElementById('workflow')?.scrollIntoView({ behavior: 'smooth' })
+          }}
+        />
+
+        <AuthModal
+          open={authModalOpen}
           authMode={authMode}
           authEmail={authEmail}
           authPassword={authPassword}
           authError={authError}
+          authNotice={authNotice}
           isSubmitting={isAuthSubmitting}
+          onClose={closeAuthModal}
           onEmailChange={setAuthEmail}
           onPasswordChange={setAuthPassword}
           onSignIn={() => void handleSignIn()}
           onSignUp={() => void handleSignUp()}
           onToggleMode={() => {
             setAuthError(null)
+            setAuthNotice(null)
             setAuthMode((mode) => (mode === 'sign-in' ? 'sign-up' : 'sign-in'))
           }}
         />
@@ -1029,27 +972,30 @@ export default function App() {
     )
   }
 
+  if (!session) {
+    return <LoadingScreen />
+  }
+
   return (
-    <div className="app-bg">
+    <div className="app-bg app-shell-bg">
       <div className="bg-orb orb-one" />
       <div className="bg-orb orb-two" />
       <div className="bg-orb orb-three" />
 
-      <TopNav
-        onGoLanding={() => setView('landing')}
+      <AppTopNav
         onGoProjects={() => setView('projects')}
+        onBackToSite={returnToMarketing}
         onLogout={() => void handleSignOut()}
         userEmail={session.user.email ?? undefined}
       />
 
       <main className="container app-main">
         {apiError ? (
-          <div className="card" style={{ marginBottom: 20, borderColor: '#fecdd3' }}>
-            <strong style={{ color: '#be123c' }}>API message</strong>
-            <p className="muted-copy" style={{ marginTop: 8 }}>
-              {apiError}
-            </p>
-          </div>
+          <GlassAlert
+            message={apiError}
+            onRetry={() => void loadProjectsFromApi()}
+            onDismiss={() => setApiError(null)}
+          />
         ) : null}
 
         <AnimatePresence mode="wait">
@@ -1058,156 +1004,11 @@ export default function App() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.22 }}
+            transition={{ duration: 0.35, ease: 'easeOut' }}
           >
-            {view === 'landing' && (
-              <div className="stack-xl">
-                <section className="hero-grid">
-                  <div className="stack-lg">
-                    <span className="eyebrow">Product operations platform</span>
-
-                    <div className="stack-md">
-                      <h1 className="hero-title">
-                        From feedback collection to PRDs and execution-ready tasks
-                      </h1>
-                      <p className="hero-subtitle">
-                        SignalForge gives product teams one structured system to
-                        collect product signals, generate insight, standardize
-                        requirements, and prepare work for delivery.
-                      </p>
-                    </div>
-
-                    <div className="button-row">
-                      <button className="btn btn-dark" onClick={() => setView('projects')}>
-                        Explore SignalForge <ArrowRight size={16} />
-                      </button>
-
-                      <button
-                        className="btn btn-light"
-                        onClick={() => {
-                          if (projects.length > 0) {
-                            void openProject(projects[0])
-                          } else {
-                            startDemoPreview()
-                          }
-                        }}
-                      >
-                        Review current module
-                      </button>
-                    </div>
-
-                    <div className="mini-grid">
-                      {[
-                        ['Collection', 'Forms, surveys, imports'],
-                        ['Standardization', 'Insights and PRDs'],
-                        ['Execution', 'Tasks for delivery'],
-                      ].map(([label, value]) => (
-                        <article key={label} className="mini-card card">
-                          <span>{label}</span>
-                          <strong>{value}</strong>
-                        </article>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="card hero-panel">
-                    <div className="panel-header">
-                      <div>
-                        <div className="muted-label">Current release focus</div>
-                        <h2>SignalForge Insights</h2>
-                        <p>
-                          The first public module demonstrates how raw feedback
-                          becomes structured insight that teams can carry into
-                          documentation and delivery.
-                        </p>
-                      </div>
-
-                      <span className="badge badge-indigo">Module 01</span>
-                    </div>
-
-                    <div className="stats-row">
-                      {[
-                        ['Themes', '4'],
-                        ['Pain points', '3'],
-                        ['Priority cues', '4'],
-                      ].map(([label, value]) => (
-                        <div key={label} className="stat-card">
-                          <span>{label}</span>
-                          <strong>{value}</strong>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="proof-box">
-                      <div className="proof-title">What the current module proves</div>
-
-                      {[
-                        'Cluster scattered feedback into readable themes',
-                        'Separate pain points from requests and signals',
-                        'Create a reliable starting point for PRDs and tasks',
-                      ].map((item) => (
-                        <div key={item} className="proof-item">
-                          <span className="proof-icon">
-                            <CheckCircle2 size={14} />
-                          </span>
-                          <span>{item}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </section>
-
-                <section className="grid-4">
-                  {[
-                    [
-                      FolderKanban,
-                      'Collect',
-                      'Capture feedback and product inputs from structured or unstructured sources.',
-                    ],
-                    [
-                      Layers3,
-                      'Insights',
-                      'Turn raw signals into themes, pain points, requests, and priority cues.',
-                    ],
-                    [
-                      FileText,
-                      'PRD Studio',
-                      'Convert validated insight into a structured product requirements draft.',
-                    ],
-                    [
-                      ListChecks,
-                      'Tasks',
-                      'Generate execution-ready tasks, user stories, and acceptance criteria.',
-                    ],
-                  ].map(([Icon, title, text]) => (
-                    <article
-                      key={title as string}
-                      className={
-                        title === 'Insights'
-                          ? 'card feature-card feature-card-active'
-                          : 'card feature-card'
-                      }
-                    >
-                      <div
-                        className={
-                          title === 'Insights'
-                            ? 'feature-icon feature-icon-indigo'
-                            : 'feature-icon'
-                        }
-                      >
-                        {typeof Icon !== 'string' && <Icon size={20} />}
-                      </div>
-                      <h3>SignalForge {title as string}</h3>
-                      <p>{text as string}</p>
-                    </article>
-                  ))}
-                </section>
-              </div>
-            )}
-
             {view === 'projects' && (
               <div className="stack-lg">
-                <section className="card header-card">
+                <section className="glass-card header-card">
                   <div>
                     <div className="muted-label">Projects</div>
                     <h2>Manage active product workflows</h2>
@@ -1257,19 +1058,18 @@ export default function App() {
                 </section>
 
                 {isLoading && projects.length === 0 ? (
-                  <section className="card section-card">
+                  <section className="glass-card section-card">
                     <p className="muted-copy">Loading projects from backend...</p>
                   </section>
                 ) : null}
 
                 {projects.length === 0 && !isLoading ? (
-                  <section className="card section-card empty-state-card">
+                  <section className="glass-card section-card empty-state-card">
                     <div className="section-head">
                       <h3>No projects yet</h3>
                       <p>
-                        Create your first SignalForge project to turn raw feedback
-                        into structured insights, a report, PRD, and execution-ready
-                        tasks.
+                        Create your first workspace to turn feedback into insights,
+                        PRDs, and tasks.
                       </p>
                     </div>
 
@@ -1296,7 +1096,11 @@ export default function App() {
                 ) : (
                   <section className="grid-3">
                     {projects.map((project) => (
-                      <article key={project.id} className="card project-card">
+                      <motion.article
+                        key={project.id}
+                        className="glass-card project-card"
+                        whileHover={{ y: -4, transition: { duration: 0.25 } }}
+                      >
                         <div className="tag-row">
                           <span className="badge badge-neutral">{project.stage}</span>
                           <span className="badge badge-green">{project.status}</span>
@@ -1327,7 +1131,7 @@ export default function App() {
                               : 'Continue'}
                           </button>
                         </div>
-                      </article>
+                      </motion.article>
                     ))}
                   </section>
                 )}
